@@ -9,8 +9,10 @@ class HuBMAPDataset(Dataset):
     def __init__(self, base_dir, mode):
         self.base_dir = base_dir
         self.mode = mode
-        self.images = []
-        self.patient_masks = {}  # The masks for 9 training patients.
+        self.slice_indexes = []
+        self.train_patient_images = {}
+        self.train_patient_masks = {}  # The masks for 9 training patients.
+
         self.img_dim = {}  # Height and width of tiff file for each patient.
         # Get all patients masks.
         patients = pd.read_csv(base_dir + "/train.csv")
@@ -21,16 +23,20 @@ class HuBMAPDataset(Dataset):
             patient_metadata = dataset_info.loc[dataset_info["image_file"] == patientName + ".tiff"]
             height = patient_metadata["height_pixels"].iloc[0]
             width = patient_metadata["width_pixels"].iloc[0]
-            self.patient_masks[patientName] = self.rle_to_mask(patients['encoding'].iloc[i], (height, width))
+            self.train_patient_masks[patientName] = self.rle_to_mask(patients['encoding'].iloc[i], (height, width))
+            self.train_patient_images[patientName] = tiff.imread(self.base_dir + "/" + patientName + '.tiff')
+            if (len(self.train_patient_images[patientName].shape) > 3):
+                self.train_patient_images[patientName] = self.train_patient_images[patientName].squeeze(0).squeeze(0)
+                self.train_patient_images[patientName] = np.moveaxis(self.train_patient_images[patientName], 0, -1)
             grid = self.make_grid((height, width), window=1024)
             _id = [patientName]*grid.shape[0]
             _id = np.array(_id).reshape(grid.shape[0], 1)
             # Concatenate patient name
             grid = np.concatenate((grid, np.array(_id)), axis = 1)
-            if len(self.images) > 0:
-                self.images = np.concatenate((self.images, grid), axis = 0)
+            if len(self.slice_indexes) > 0:
+                self.slice_indexes = np.concatenate((self.slice_indexes, grid), axis = 0)
             else:
-                self.images = grid
+                self.slice_indexes = grid
 
             # print(self.patient_masks)
             # plt.imshow(self.patient_masks[patientName])
@@ -68,17 +74,10 @@ class HuBMAPDataset(Dataset):
         return slices.reshape(nx * ny, 4)
 
     def __getitem__(self, index):
-        x1, x2, y1, y2, patient = self.images[index]
-        patient_img = tiff.imread(self.base_dir + "/" + patient + '.tiff')
-        print("Before Tiff file dim: ", patient_img.shape)
-        if(len(patient_img.shape) > 3):
-            patient_img = patient_img.squeeze(0).squeeze(0)
-            patient_img = np.moveaxis(patient_img, 0, -1)
-        print("After Tiff file dim: ", patient_img.shape)
-        print("--"*20)
-        slice_img = patient_img[int(y1):int(y2),int(x1):int(x2)]
-        slice_mask = self.patient_masks[str(self.images[index][-1])][int(y1):int(y2),int(x1):int(x2)]
+        x1, x2, y1, y2, patient = self.slice_indexes[index]
+        slice_img = self.train_patient_images[patient][int(y1):int(y2),int(x1):int(x2)]
+        slice_mask = self.train_patient_masks[patient][int(y1):int(y2),int(x1):int(x2)]
         return slice_img, slice_mask
 
     def __len__(self):
-        return len(self.images)
+        return len(self.slice_indexes)

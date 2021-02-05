@@ -120,9 +120,9 @@ if __name__ == '__main__':
     ##################################
     # Load dataset
     ##################################
-    os.system('cp {}/dataset/dataset.py {}'.format(BASE_DIR, save_dir))
+    # os.system('cp {}/dataset/dataset.py {}'.format(BASE_DIR, save_dir))
 
-    train_dataset = HuBMAPDataset(BASE_DIR, mode="train")
+    train_dataset = HuBMAPDataset(BASE_DIR + "/trainData", mode="train")
     # print(trainset[0])
     train_loader = DataLoader(train_dataset, batch_size=options.batch_size,
                               shuffle=True, num_workers=options.workers, drop_last=False)
