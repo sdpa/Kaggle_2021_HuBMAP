@@ -242,7 +242,6 @@ class EfficientNet(nn.Module):
         # Stem
         x = self._swish(self._bn0(self._conv_stem(inputs)))
         prev_x = x
-
         # Blocks
         for idx, block in enumerate(self._blocks):
             drop_connect_rate = self._global_params.drop_connect_rate
@@ -268,8 +267,10 @@ class EfficientNet(nn.Module):
             layer in the efficientnet model.
         """
         # Stem
-        x = self._swish(self._bn0(self._conv_stem(inputs)))
-
+        x = self._conv_stem(inputs)
+        x = self._bn0(x)
+        x = self._swish(x)
+        #x = self._swish(self._bn0())
         # Blocks
         for idx, block in enumerate(self._blocks):
             drop_connect_rate = self._global_params.drop_connect_rate

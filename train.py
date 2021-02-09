@@ -46,31 +46,30 @@ class DiceLoss(nn.Module):
 
         return 1 - dice
 
-
-loss_fn = DiceLoss()
-
-
 def train():
     model.train()
-    losses = []
+    losses = 0
     dice_coeff_list = []
     for epoch in range(options.epochs):
         for i, data in enumerate(train_loader):
             slice_img, slice_mask = data
-            slice_img, slice_mask = slice_img.to(device), slice_mask.to(device)
+            slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
+            slice_img = slice_img.permute(0, 3, 1, 2)
             pred_mask_btch = model(slice_img)
 
             loss = criterion(pred_mask_btch, slice_mask)
-            losses += loss
-            dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
-            dice_coeff_list += dice_coeff
+            #print("Loss",loss)
+            losses += loss.item()
+            #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
+            #dice_coeff_list += dice_coeff
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             if (i + 1) % options.disp_freq == 0:
-                print("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, dice_coeff))
+                print("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/i))
+                losses = 0
 
 def predict():
     pass
@@ -99,7 +98,8 @@ if __name__ == '__main__':
     ##################################
     # Create the model
     ##################################
-    model = EfficientNet.from_name(options.model)
+    model = EfficientNet.from_name(options.model, num_classes = 260*260)
+    #print(model)
     # model = EfficientNet.from_pretrained('efficientnet-b2')
 
     print('{} model Generated.'.format(options.model))

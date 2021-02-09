@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import pandas as pd
 import tifffile as tiff
+import cv2
 # import matplotlib.pyplot as plt
 
 
@@ -23,12 +24,12 @@ class HuBMAPDataset(Dataset):
             patient_metadata = dataset_info.loc[dataset_info["image_file"] == patientName + ".tiff"]
             height = patient_metadata["height_pixels"].iloc[0]
             width = patient_metadata["width_pixels"].iloc[0]
-            self.train_patient_masks[patientName] = self.rle_to_mask(patients['encoding'].iloc[i], (height, width))
+            self.train_patient_masks[patientName] = self.rle_to_mask(patients['encoding'].iloc[i], (height, width, 1))
             self.train_patient_images[patientName] = tiff.imread(self.base_dir + "/" + patientName + '.tiff')
             if (len(self.train_patient_images[patientName].shape) > 3):
                 self.train_patient_images[patientName] = self.train_patient_images[patientName].squeeze(0).squeeze(0)
                 self.train_patient_images[patientName] = np.moveaxis(self.train_patient_images[patientName], 0, -1)
-            grid = self.make_grid((height, width), window=1024)
+            grid = self.make_grid((height, width), window=260)
             _id = [patientName]*grid.shape[0]
             _id = np.array(_id).reshape(grid.shape[0], 1)
             # Concatenate patient name
@@ -52,7 +53,7 @@ class HuBMAPDataset(Dataset):
             mask[start:start + length] = 1
         return mask.reshape(size, order='F')
 
-    def make_grid(self, shape, window=1024, min_overlap=32):
+    def make_grid(self, shape, window=260, min_overlap=32):
         """
             Return Array of size (N,4), where N - number of tiles,
             2nd axis represente slices: x1,x2,y1,y2
@@ -81,3 +82,6 @@ class HuBMAPDataset(Dataset):
 
     def __len__(self):
         return len(self.slice_indexes)
+
+    def getRectangles(self):
+        return self.self.slice_indexes

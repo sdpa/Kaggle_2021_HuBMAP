@@ -205,7 +205,7 @@ class Conv2dDynamicSamePadding(nn.Conv2d):
     #     Given the following:
     #         i: width or height
     #         s: stride
-    #         k: kernel size
+    #         k: kernel sizeget_same_padding_conv2d
     #         d: dilation
     #         p: padding
     #     Output after Conv2d:
