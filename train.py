@@ -7,8 +7,8 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from HuBMAPDataset import HuBMAPDataset
-from datetime import datetime
-from models.efficientnet import EfficientNet
+from models.EfficientUnet.efficientnet import EfficientNet
+from models.EfficientUnet.efficient_unet import *
 from config import options
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -35,6 +35,8 @@ class DiceLoss(nn.Module):
 
     def forward(self, inputs, targets, smooth=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
+        print("Predicted final layer shape: ", inputs.shape)
+        print(inputs)
         inputs = F.sigmoid(inputs)
 
         # flatten label and prediction tensors
@@ -68,11 +70,12 @@ def train():
             optimizer.step()
 
             if (i + 1) % options.disp_freq == 0:
-                print("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/i))
+                print("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/(i + 1)))
                 losses = 0
 
 def predict():
     pass
+
 
 
 if __name__ == '__main__':
@@ -82,23 +85,23 @@ if __name__ == '__main__':
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    save_dir = options.save_dir
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    save_dir = os.path.join(save_dir, datetime.now().strftime('%Y%m%d_%H%M%S'))
-    os.makedirs(save_dir)
-
-    print(str(options) + '\n')
-
-    model_dir = os.path.join(save_dir, 'models')
-    logs_dir = os.path.join(save_dir, 'tf_logs')
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
+    # save_dir = options.save_dir
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
+    # save_dir = os.path.join(save_dir, datetime.now().strftime('%Y%m%d_%H%M%S'))
+    # os.makedirs(save_dir)
+    #
+    # print(str(options) + '\n')
+    #
+    # model_dir = os.path.join(save_dir, 'models')
+    # logs_dir = os.path.join(save_dir, 'tf_logs')
+    # if not os.path.exists(model_dir):
+    #     os.makedirs(model_dir)
 
     ##################################
     # Create the model
     ##################################
-    model = EfficientNet.from_name(options.model, num_classes = 260*260)
+    model = get_efficientunet_b2(out_channels=2, pretrained=False)
     #print(model)
     # model = EfficientNet.from_pretrained('efficientnet-b2')
 

@@ -76,6 +76,7 @@ class EfficientNet(nn.Module):
         x = self._conv_stem(x)
         x = self._bn0(x)
         x = self._swish(x)
+        print("Done with stem")
 
         # Blocks
         for idx, block in enumerate(self._blocks):

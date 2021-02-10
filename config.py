@@ -38,7 +38,8 @@ parser.add_option('--lr', '--lr', dest='lr', default=0.001, type='float',
 parser.add_option('--sd', '--save-dir', dest='save_dir', default='./save',
                   help='saving directory of .ckpt models (default: ./save)')
 
-
+parser.add_option('--loo', '--leave-one-out', dest='test_tiff_value', default=0,
+                  help='Tiff file to remove from train and add to validation set')
 
 
 options, _ = parser.parse_args()
