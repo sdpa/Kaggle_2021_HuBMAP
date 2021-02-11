@@ -76,7 +76,6 @@ class EfficientNet(nn.Module):
         x = self._conv_stem(x)
         x = self._bn0(x)
         x = self._swish(x)
-        print("Done with stem")
 
         # Blocks
         for idx, block in enumerate(self._blocks):
@@ -135,6 +134,7 @@ class EfficientNet(nn.Module):
                     if drop_connect_rate:
                         drop_connect_rate *= idx / len(self.blocks)
                     x = block(x, drop_connect_rate)
+
 
                 # Head
                 x = self.head_conv(x)

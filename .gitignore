@@ -1,4 +1,5 @@
 trainData/
+testData/
 save/
 .idea/
 __pycache__/

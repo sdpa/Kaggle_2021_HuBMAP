@@ -66,6 +66,8 @@ class EfficientUnet(nn.Module):
         self.encoder = encoder
         self.concat_input = concat_input
 
+        #self.matching_padding = (1,1)
+
         self.up_conv1 = up_conv(self.n_channels, 512)
         self.double_conv1 = double_conv(self.size[0], 512)
         self.up_conv2 = up_conv(512, 256)
@@ -73,6 +75,7 @@ class EfficientUnet(nn.Module):
         self.up_conv3 = up_conv(256, 128)
         self.double_conv3 = double_conv(self.size[2], 128)
         self.up_conv4 = up_conv(128, 64)
+
         self.double_conv4 = double_conv(self.size[3], 64)
 
         if self.concat_input:
@@ -101,21 +104,33 @@ class EfficientUnet(nn.Module):
 
         blocks = get_blocks_to_be_concat(self.encoder, x)
         _, x = blocks.popitem()
-
+        y = blocks.popitem()[1]
+        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv1(x)
-        x = torch.cat([x, blocks.popitem()[1]], dim=1)
+        x = torch.cat([x, y], dim=1)
         x = self.double_conv1(x)
 
+
+        y = blocks.popitem()[1]
+        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv2(x)
-        x = torch.cat([x, blocks.popitem()[1]], dim=1)
+        x = torch.cat([x, y], dim=1)
         x = self.double_conv2(x)
 
+
+        y = blocks.popitem()[1]
+        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv3(x)
-        x = torch.cat([x, blocks.popitem()[1]], dim=1)
+
+        x = torch.cat([x, y], dim=1)
         x = self.double_conv3(x)
 
+
+        y = blocks.popitem()[1]
+        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv4(x)
-        x = torch.cat([x, blocks.popitem()[1]], dim=1)
+
+        x = torch.cat([x, y], dim=1)
         x = self.double_conv4(x)
 
         if self.concat_input:
@@ -126,6 +141,12 @@ class EfficientUnet(nn.Module):
         x = self.final_conv(x)
 
         return x
+
+def get_matching_padding(input_size):
+    output_size = input_size
+    n = output_size - 1 - ((input_size - 1) * 2)
+    return n // -2, n // -2
+
 
 
 def get_efficientunet_b0(out_channels=2, concat_input=True, pretrained=True):
