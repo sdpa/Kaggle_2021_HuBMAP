@@ -63,12 +63,10 @@ class HuBMAPDataset(Dataset):
                 self.slice_indexes = np.concatenate((self.slice_indexes, grid), axis=0)
             else:
                 self.slice_indexes = grid
-        print("DatasetLength Before: ", len(self.slice_indexes))
         # for i,slice in enumerate(self.slice_indexes):
         #     x1, x2, y1, y2, patient = slice
         #     if int(np.sum(self.masks[patient][int(x1):int(x2), int(y1):int(y2)])) == 0:
         #         self.slice_indexes = np.delete(self.slice_indexes, i,axis=0)
-        print("DatasetLength After: ", len(self.slice_indexes))
 
 
     def rle_to_mask(self, encoding, size):
