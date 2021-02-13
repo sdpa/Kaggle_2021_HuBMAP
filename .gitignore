@@ -1,5 +1,9 @@
+maskCrops/
+ImgCrops/
 trainData/
 testData/
 save/
 .idea/
 __pycache__/
+qdphm_1/
+qupath_data_processing/

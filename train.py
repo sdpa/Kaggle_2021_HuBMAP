@@ -52,7 +52,7 @@ class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
+    def forward(self, inputs, targets, smooth=1.):
         # comment out if your model contains a sigmoid or equivalent activation layer
         # log_string(inputs)
         # inputs = F.sigmoid(inputs)
@@ -126,7 +126,7 @@ def predict():
     subsmission = {}
     model.eval()
     meta_data = pd.read_csv(BASE_DIR + '/trainData/HuBMAP-20-dataset_information.csv')
-    all_files = os.listdir(BASE_DIR + "testData/")
+    all_files = os.listdir(BASE_DIR + "/testData/")
     patients = [file[:-5] for file in all_files if file[-5:] == ".tiff"]
     with torch.no_grad():
         for i, patient in enumerate(patients):
