@@ -2,7 +2,6 @@ from collections import OrderedDict
 from .layers import *
 from .efficientnet import EfficientNet
 
-
 __all__ = ['EfficientUnet', 'get_efficientunet_b0', 'get_efficientunet_b1', 'get_efficientunet_b2',
            'get_efficientunet_b3', 'get_efficientunet_b4', 'get_efficientunet_b5', 'get_efficientunet_b6',
            'get_efficientunet_b7']
@@ -66,8 +65,6 @@ class EfficientUnet(nn.Module):
         self.encoder = encoder
         self.concat_input = concat_input
 
-        #self.matching_padding = (1,1)
-
         self.up_conv1 = up_conv(self.n_channels, 512)
         self.double_conv1 = double_conv(self.size[0], 512)
         self.up_conv2 = up_conv(512, 256)
@@ -105,29 +102,22 @@ class EfficientUnet(nn.Module):
         blocks = get_blocks_to_be_concat(self.encoder, x)
         _, x = blocks.popitem()
         y = blocks.popitem()[1]
-        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv1(x)
         x = torch.cat([x, y], dim=1)
         x = self.double_conv1(x)
 
-
         y = blocks.popitem()[1]
-        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv2(x)
         x = torch.cat([x, y], dim=1)
         x = self.double_conv2(x)
 
-
         y = blocks.popitem()[1]
-        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv3(x)
 
         x = torch.cat([x, y], dim=1)
         x = self.double_conv3(x)
 
-
         y = blocks.popitem()[1]
-        #self.matching_padding = get_matching_padding(input_size=y.shape[0])
         x = self.up_conv4(x)
 
         x = torch.cat([x, y], dim=1)
@@ -141,12 +131,6 @@ class EfficientUnet(nn.Module):
         x = self.final_conv(x)
 
         return x
-
-def get_matching_padding(input_size):
-    output_size = input_size
-    n = output_size - 1 - ((input_size - 1) * 2)
-    return n // -2, n // -2
-
 
 
 def get_efficientunet_b0(out_channels=2, concat_input=True, pretrained=True):

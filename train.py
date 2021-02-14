@@ -5,6 +5,7 @@ import torch.backends.cudnn as cudnn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import Adam
+from datetime import datetime
 
 from HuBMAPCropDataset import HuBMAPCropDataset
 from models.EfficientUnet.efficientnet import EfficientNet
@@ -12,6 +13,11 @@ from models.EfficientUnet.efficient_unet import *
 from config import options
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+
+def log_string(out_str):
+    LOG_FOUT.write(out_str + '\n')
+    LOG_FOUT.flush()
+    print(out_str)
 
 
 def get_dice_coeff(pred, targs):
@@ -24,7 +30,6 @@ def get_dice_coeff(pred, targs):
 
     Returns: Dice coeff over a batch or over a single pair.
     '''
-
     pred = (pred > 0).float()
     return 2.0 * (pred * targs).sum() / ((pred + targs).sum() + 1.0)
 
@@ -33,10 +38,8 @@ class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
+    def forward(self, inputs, targets, smooth=0):
         # comment out if your model contains a sigmoid or equivalent activation layer
-        print("Predicted final layer shape: ", inputs.shape)
-        print(inputs)
         inputs = F.sigmoid(inputs)
 
         # flatten label and prediction tensors
@@ -49,10 +52,18 @@ class DiceLoss(nn.Module):
         return 1 - dice
 
 def train():
+    log_string('lr is ' + str(options.lr))
+
+    best_loss = 100
+    best_acc = 0
+    global_step = 0
+
     model.train()
     losses = 0
     dice_coeff_list = []
     for epoch in range(options.epochs):
+        log_string('**' * 40)
+        log_string('Training Epoch %03d' % (epoch + 1))
         for i, data in enumerate(train_loader):
             slice_img, slice_mask = data
             slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
@@ -69,13 +80,51 @@ def train():
             optimizer.step()
 
             if (i + 1) % options.disp_freq == 0:
-                print("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/(i + 1)))
+                log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/(i + 1)))
                 losses = 0
+
+            if (i + 1) % options.val_freq == 0:
+                log_string('--' * 40)
+                log_string('Evaluating at step #{}'.format(i))
+                best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
+                model.train()
+
+def evaluate(**kwargs):
+    best_loss = kwargs['best_loss']
+    best_acc = kwargs['best_acc']
+    model.eval()
+    val_loss = 0
+    val_acc = 0
+    with torch.no_grad():
+        for i, data in enumerate(val_loader):
+            slice_img, slice_mask = data
+            slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
+            pred_mask_btch = model(slice_img)
+
+            loss = criterion(pred_mask_btch, slice_mask)
+            #print("Loss",loss)
+            val_loss += loss.item()
+            val_acc += get_dice_coeff(pred_mask_btch, slice_mask)
+
+            #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
+            #dice_coeff_list += dice_coeff
+        val_loss = val_loss/(i + 1)
+        val_acc = val_acc/(i+1)
+
+    # check for improvement
+    loss_str, acc_str = '', ''
+    if val_loss <= best_loss:
+        loss_str, best_loss = '(improved)', val_loss
+    if val_acc >= best_acc:
+        acc_str, best_acc = '(improved)', val_acc
+    # display
+    log_string("validation_loss: {0:.4f} {1}".format(val_loss, loss_str))
+    log_string("validation_accuracy: {0:.4f} {1}".format(val_acc, acc_str))
+    log_string('--' * 40)
+    return best_loss, best_acc
 
 def predict():
     pass
-
-
 
 if __name__ == '__main__':
     ##################################
@@ -84,18 +133,24 @@ if __name__ == '__main__':
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # save_dir = options.save_dir
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-    # save_dir = os.path.join(save_dir, datetime.now().strftime('%Y%m%d_%H%M%S'))
-    # os.makedirs(save_dir)
-    #
-    # print(str(options) + '\n')
-    #
-    # model_dir = os.path.join(save_dir, 'models')
-    # logs_dir = os.path.join(save_dir, 'tf_logs')
-    # if not os.path.exists(model_dir):
-    #     os.makedirs(model_dir)
+    save_dir = options.save_dir
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    save_dir = os.path.join(save_dir, datetime.now().strftime('%Y%m%d_%H%M%S'))
+    os.makedirs(save_dir)
+
+    LOG_FOUT = open(os.path.join(save_dir, 'log_train.txt'), 'w')
+    LOG_FOUT.write(str(options) + '\n')
+
+    print(str(options) + '\n')
+
+    model_dir = os.path.join(save_dir, 'models')
+    logs_dir = os.path.join(save_dir, 'tf_logs')
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+
+    os.system('cp {}/train.py {}'.format(BASE_DIR, save_dir))
+    os.system('cp {}/HuBMAPCropDataset.py {}'.format(BASE_DIR, save_dir))
 
     ##################################
     # Create the model
@@ -137,8 +192,8 @@ if __name__ == '__main__':
     ##################################
     # TRAINING
     ##################################
-    print('')
-    print('Start training: Total epochs: {}, Batch size: {}, Training size: {}, Validation size: ...'.
-               format(options.epochs, options.batch_size, len(train_dataset)))
+    log_string('')
+    log_string('Start training: Total epochs: {}, Batch size: {}, Training size: {}, Validation size: {}'.
+               format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
     train()
     # predict()

@@ -3,13 +3,13 @@ from optparse import OptionParser
 
 parser = OptionParser()
 
-parser.add_option('-e', '--epochs', dest='epochs', default=2, type='int',
+parser.add_option('-e', '--epochs', dest='epochs', default=200, type='int',
                   help='number of epochs (default: 100)')
-parser.add_option('-b', '--batch-size', dest='batch_size', default=16, type='int',
+parser.add_option('-b', '--batch-size', dest='batch_size', default=4, type='int',
                   help='batch size (default: 16)')
-parser.add_option('--df', '--disp_freq', dest='disp_freq', default=200, type='int',
+parser.add_option('--df', '--disp_freq', dest='disp_freq', default=150, type='int',
                   help='frequency of displaying the training results (default: 100)')
-parser.add_option('--vf', '--val_freq', dest='val_freq', default=800, type='int',
+parser.add_option('--vf', '--val_freq', dest='val_freq', default=300, type='int',
                   help='run validation for each <val_freq> iterations (default: 2000)')
 parser.add_option('-j', '--workers', dest='workers', default=0, type='int',
                   help='number of data loading workers (default: 16)')

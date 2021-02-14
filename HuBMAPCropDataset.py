@@ -72,6 +72,11 @@ class HuBMAPCropDataset(Dataset):
 
             img = transforms.ToTensor()(img)
             mask = transforms.ToTensor()(mask)
+            mask = mask * 255
+
+            img = transforms.Resize((512, 512), Image.BILINEAR)(img)
+            mask = transforms.Resize((512, 512), Image.BILINEAR)(mask)
+
             return img, mask
         elif self.mode == "test":
             x1, x2, y1, y2, patient = self.slice_indexes[index]
