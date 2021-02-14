@@ -17,13 +17,9 @@ class HuBMAPDataset(Dataset):
         self.images = {}
         self.masks = {}  # The masks for 9 training patients.
 
-        self.img_dim = {}  # Height and width of tiff file for each patient.
-        # Get all patients masks.
-        train_patients = pd.read_csv(base_dir + "/train.csv")
-        metadata = pd.read_csv(base_dir + "/HuBMAP-20-dataset_information.csv")
-        valid_patients = None
-        # print(dataset_info)
         if mode == "train" or "val":
+            train_patients = pd.read_csv(base_dir + "/train.csv")
+            metadata = pd.read_csv(base_dir + "/HuBMAP-20-dataset_information.csv")
             if mode == "train":
                 patients = train_patients.drop(options.test_tiff_value)
             else:

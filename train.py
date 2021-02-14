@@ -7,17 +7,28 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from datetime import datetime
 
+import tifffile as tiff
 from HuBMAPCropDataset import HuBMAPCropDataset
 from models.EfficientUnet.efficientnet import EfficientNet
 from models.EfficientUnet.efficient_unet import *
+import pandas as pd
 from config import options
+import numpy as np
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 def log_string(out_str):
     LOG_FOUT.write(out_str + '\n')
     LOG_FOUT.flush()
     print(out_str)
+
+def rle_encode_less_memory(img):
+    pixels = img.T.flatten()
+    pixels[0] = 0
+    pixels[-1] = 0
+    runs = np.where(pixels[1:] != pixels[:-1])[0] + 2
+    runs[1::2] -= runs[::2]
+    return ' '.join(str(x) for x in runs)
 
 
 def get_dice_coeff(pred, targs):
@@ -124,7 +135,35 @@ def evaluate(**kwargs):
     return best_loss, best_acc
 
 def predict():
-    pass
+    subm = {}
+    all_files = os.listdir(BASE_DIR + "/testData")
+    patient_files = [x for x in all_files if '.tiff' in x]
+    for patient_file in patient_files:
+        name = patient_file[:-5]
+        test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
+        test_loader = DataLoader(test_dataset, batch_size=options.batch_size,
+                                 shuffle=False, num_workers=options.workers, drop_last=False)
+        height, width = test_dataset.get_global_image_size()
+        global_mask = torch.zeros((height, width))
+        model.eval()
+        with torch.no_grad():
+            for i, data in enumerate(test_loader):
+                img_batch, coordinates_batch = data
+                img_batch = img_batch.to(device, dtype=torch.float)
+                pred_mask_batch = model(img_batch)
+                pred_mask_batch = (pred_mask_batch > 0.5).float()
+                for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
+                    each_mask = each_mask.permute(1,2,0)
+                    each_mask = torch.squeeze(each_mask)
+                    x1, x2, y1, y2 = coordinate
+                    global_mask[int(x1):int(x2), int(y1):int(y2)] = each_mask
+        rle_pred = rle_encode_less_memory(global_mask.numpy())
+        subm[i] = {'id': name, 'predicted': rle_pred}
+        del global_mask, rle_pred
+
+    df_sub = pd.DataFrame(subm).T
+    df_sub.to_csv('submission.csv', index=False)
+    print("Done Testing")
 
 if __name__ == '__main__':
     ##################################
@@ -185,9 +224,6 @@ if __name__ == '__main__':
     val_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="val")
     val_loader = DataLoader(val_dataset, batch_size=options.batch_size,
                               shuffle=False, num_workers=options.workers, drop_last=False)
-    # test_dataset = data(mode='test', data_len=options.data_len)
-    # test_loader = DataLoader(test_dataset, batch_size=options.batch_size,
-    #                          shuffle=False, num_workers=options.workers, drop_last=False)
 
     ##################################
     # TRAINING
@@ -196,4 +232,4 @@ if __name__ == '__main__':
     log_string('Start training: Total epochs: {}, Batch size: {}, Training size: {}, Validation size: {}'.
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
     train()
-    # predict()
+    predict()
