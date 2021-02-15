@@ -94,11 +94,11 @@ def train():
                 log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/(i + 1)))
                 losses = 0
 
-            if (i + 1) % options.val_freq == 0:
-                log_string('--' * 40)
-                log_string('Evaluating at step #{}'.format(i))
-                best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
-                model.train()
+            # if (i + 1) % options.val_freq == 0:
+            #     log_string('--' * 40)
+            #     log_string('Evaluating at step #{}'.format(i))
+            #     best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
+            #     model.train()
 
 def evaluate(**kwargs):
     best_loss = kwargs['best_loss']
@@ -140,27 +140,30 @@ def predict():
     patient_files = [x for x in all_files if '.tiff' in x]
     for patient_file in patient_files:
         name = patient_file[:-5]
+        print("Predicting for patient: {}".format(name))
         test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
         test_loader = DataLoader(test_dataset, batch_size=options.batch_size,
                                  shuffle=False, num_workers=options.workers, drop_last=False)
         height, width = test_dataset.get_global_image_size()
-        global_mask = torch.zeros((height, width))
+        global_mask = torch.zeros((height, width), dtype=torch.int8)
         model.eval()
         with torch.no_grad():
             for i, data in enumerate(test_loader):
                 img_batch, coordinates_batch = data
                 img_batch = img_batch.to(device, dtype=torch.float)
                 pred_mask_batch = model(img_batch)
-                pred_mask_batch = (pred_mask_batch > 0.5).float()
+                pred_mask_batch = (pred_mask_batch > 0.5).type(torch.int8)
+                # pred_mask_batch = pred_mask_batch.type(torch.int8)
                 for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
                     each_mask = each_mask.permute(1,2,0)
                     each_mask = torch.squeeze(each_mask)
+                    # xs = columns, ys = columns.
                     x1, x2, y1, y2 = coordinate
-                    global_mask[int(x1):int(x2), int(y1):int(y2)] = each_mask
+                    global_mask[int(y1):int(y2), int(x1):int(x2)] = each_mask
         rle_pred = rle_encode_less_memory(global_mask.numpy())
         subm[i] = {'id': name, 'predicted': rle_pred}
         del global_mask, rle_pred
-
+        print("processed {}".format(name))
     df_sub = pd.DataFrame(subm).T
     df_sub.to_csv('submission.csv', index=False)
     print("Done Testing")

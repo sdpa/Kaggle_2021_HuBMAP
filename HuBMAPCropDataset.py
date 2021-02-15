@@ -47,7 +47,8 @@ class HuBMAPCropDataset(Dataset):
             self.global_img = tiff_file
 
     def make_grid(self, shape, window=512, min_overlap=0):
-        x, y = shape
+        # y = rows, x = cols
+        y, x = shape
         nx = x // (window - min_overlap) + 1
         x1 = np.linspace(0, x, num=nx, endpoint=False, dtype=np.int64)
         x1[-1] = x - window
@@ -63,6 +64,7 @@ class HuBMAPCropDataset(Dataset):
         return slices.reshape(nx * ny, 4)
 
     def get_global_image_size(self):
+        # Returns rows, columns
         return self.global_img.shape[0], self.global_img.shape[1]
 
     def __getitem__(self, index):
@@ -82,7 +84,7 @@ class HuBMAPCropDataset(Dataset):
         elif self.mode == "test":
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
-            img = self.global_img[x1:x2,y1:y2,:]
+            img = self.global_img[y1:y2,x1:x2,:]
             coordinate = torch.tensor([x1, x2, y1, y2])
             img = transforms.ToTensor()(img)
             return img, coordinate
