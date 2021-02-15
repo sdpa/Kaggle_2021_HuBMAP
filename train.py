@@ -152,14 +152,16 @@ def predict():
                 img_batch, coordinates_batch = data
                 img_batch = img_batch.to(device, dtype=torch.float)
                 pred_mask_batch = model(img_batch)
+
+                # Converts mask to 0/1.
                 pred_mask_batch = (pred_mask_batch > 0.5).type(torch.int8)
-                # pred_mask_batch = pred_mask_batch.type(torch.int8)
+
+                # Loop through each img,mask in batch.
                 for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
-                    each_mask = each_mask.permute(1,2,0)
                     each_mask = torch.squeeze(each_mask)
-                    # xs = columns, ys = columns.
+                    # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
                     x1, x2, y1, y2 = coordinate
-                    global_mask[int(y1):int(y2), int(x1):int(x2)] = each_mask
+                    global_mask[y1:y2,x1:x2] = each_mask
         rle_pred = rle_encode_less_memory(global_mask.numpy())
         subm[i] = {'id': name, 'predicted': rle_pred}
         del global_mask, rle_pred
@@ -234,5 +236,5 @@ if __name__ == '__main__':
     log_string('')
     log_string('Start training: Total epochs: {}, Batch size: {}, Training size: {}, Validation size: {}'.
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
-    train()
+    #train()
     predict()
