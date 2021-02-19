@@ -3,9 +3,9 @@ from optparse import OptionParser
 
 parser = OptionParser()
 
-parser.add_option('-e', '--epochs', dest='epochs', default=100, type='int',
+parser.add_option('-e', '--epochs', dest='epochs', default=200, type='int',
                   help='number of epochs (default: 100)')
-parser.add_option('-b', '--batch-size', dest='batch_size', default=4, type='int',
+parser.add_option('-b', '--batch-size', dest='batch_size', default=8, type='int',
                   help='batch size (default: 16)')
 parser.add_option('--df', '--disp_freq', dest='disp_freq', default=150, type='int',
                   help='frequency of displaying the training results (default: 100)')

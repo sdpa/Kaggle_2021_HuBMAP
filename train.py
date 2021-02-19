@@ -14,8 +14,9 @@ from models.EfficientUnet.efficient_unet import *
 import pandas as pd
 from config import options
 import numpy as np
+from PIL import Image
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def log_string(out_str):
     LOG_FOUT.write(out_str + '\n')
@@ -29,6 +30,33 @@ def rle_encode_less_memory(img):
     runs = np.where(pixels[1:] != pixels[:-1])[0] + 2
     runs[1::2] -= runs[::2]
     return ' '.join(str(x) for x in runs)
+
+def global_shift_mask(maskpred1, y_shift, x_shift):
+    """
+    applies a global shift to a mask by
+    padding one side and cropping from the other
+    """
+    if y_shift < 0 and x_shift >=0:
+        maskpred2 = np.pad(maskpred1,
+                           [(0,abs(y_shift)), (abs(x_shift), 0)],
+                           mode='constant', constant_values=0)
+        maskpred3 = maskpred2[abs(y_shift):, :maskpred1.shape[1]]
+    elif y_shift >=0 and x_shift <0:
+        maskpred2 = np.pad(maskpred1,
+                           [(abs(y_shift),0), (0, abs(x_shift))],
+                           mode='constant', constant_values=0)
+        maskpred3 = maskpred2[:maskpred1.shape[0], abs(x_shift):]
+    elif y_shift >=0 and x_shift >=0:
+        maskpred2 = np.pad(maskpred1,
+                           [(abs(y_shift),0), (abs(x_shift), 0)],
+                           mode='constant', constant_values=0)
+        maskpred3 = maskpred2[:maskpred1.shape[0], :maskpred1.shape[1]]
+    elif y_shift < 0 and x_shift < 0:
+        maskpred2 = np.pad(maskpred1,
+                           [(0, abs(y_shift)), (0, abs(x_shift))],
+                           mode='constant', constant_values=0)
+        maskpred3 = maskpred2[abs(y_shift):, abs(x_shift):]
+    return maskpred3
 
 
 def get_dice_coeff(pred, targs):
@@ -49,7 +77,7 @@ class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=0):
+    def forward(self, inputs, targets, smooth=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
         inputs = F.sigmoid(inputs)
 
@@ -94,11 +122,11 @@ def train():
                 log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/(i + 1)))
                 losses = 0
 
-            # if (i + 1) % options.val_freq == 0:
-            #     log_string('--' * 40)
-            #     log_string('Evaluating at step #{}'.format(i))
-            #     best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
-            #     model.train()
+            if (i + 1) % options.val_freq == 0:
+                log_string('--' * 40)
+                log_string('Evaluating at step #{}'.format(i))
+                best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
+                model.train()
 
 def evaluate(**kwargs):
     best_loss = kwargs['best_loss']
@@ -140,7 +168,8 @@ def predict():
     patient_files = [x for x in all_files if '.tiff' in x]
     for patient_file in patient_files:
         name = patient_file[:-5]
-        print("Predicting for patient: {}".format(name))
+        log_string('--' * 40)
+        log_string("Predicting for patient: {}".format(name))
         test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
         test_loader = DataLoader(test_dataset, batch_size=options.batch_size,
                                  shuffle=False, num_workers=options.workers, drop_last=False)
@@ -154,7 +183,8 @@ def predict():
                 pred_mask_batch = model(img_batch)
 
                 # Converts mask to 0/1.
-                pred_mask_batch = (pred_mask_batch > 0.5).type(torch.int8)
+                pred_mask_batch = (pred_mask_batch > THRESHOLD).type(torch.int8)
+                pred_mask_batch = pred_mask_batch * 255
 
                 # Loop through each img,mask in batch.
                 for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
@@ -162,13 +192,20 @@ def predict():
                     # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
                     x1, x2, y1, y2 = coordinate
                     global_mask[y1:y2,x1:x2] = each_mask
-        rle_pred = rle_encode_less_memory(global_mask.numpy())
+        global_mask = global_mask.numpy()
+
+        # Apply a shift on global mask.
+        global_mask = global_shift_mask(global_mask, Y_SHIFT, X_SHIFT)
+        mask_img = Image.fromarray(global_mask)
+        mask_img.save(save_dir + "/predictions/{}_mask.png".format(name))
+        rle_pred = rle_encode_less_memory(global_mask)
+
         subm[i] = {'id': name, 'predicted': rle_pred}
         del global_mask, rle_pred
-        print("processed {}".format(name))
+        log_string("processed {}".format(name))
     df_sub = pd.DataFrame(subm).T
     df_sub.to_csv('submission.csv', index=False)
-    print("Done Testing")
+    log_string("Done Testing")
 
 if __name__ == '__main__':
     ##################################
@@ -185,13 +222,16 @@ if __name__ == '__main__':
 
     LOG_FOUT = open(os.path.join(save_dir, 'log_train.txt'), 'w')
     LOG_FOUT.write(str(options) + '\n')
-
     print(str(options) + '\n')
 
     model_dir = os.path.join(save_dir, 'models')
     logs_dir = os.path.join(save_dir, 'tf_logs')
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
+
+    predictions_dir = os.path.join(save_dir, 'predictions')
+    if not os.path.exists(predictions_dir):
+        os.makedirs(predictions_dir)
 
     os.system('cp {}/train.py {}'.format(BASE_DIR, save_dir))
     os.system('cp {}/HuBMAPCropDataset.py {}'.format(BASE_DIR, save_dir))
@@ -202,8 +242,8 @@ if __name__ == '__main__':
     model = get_efficientunet_b2(out_channels=1, pretrained=False)
     # model = EfficientNet.from_pretrained('efficientnet-b2')
 
-    print('{} model Generated.'.format(options.model))
-    print("Number of trainable parameters: {}".format(sum(param.numel() for param in model.parameters())))
+    log_string('{} model Generated.'.format(options.model))
+    log_string("Number of trainable parameters: {}".format(sum(param.numel() for param in model.parameters())))
 
     ##################################
     # Use cuda
@@ -233,6 +273,9 @@ if __name__ == '__main__':
     ##################################
     # TRAINING
     ##################################
+    THRESHOLD = 0.39
+    Y_SHIFT = -40
+    X_SHIFT = -24
     log_string('')
     log_string('Start training: Total epochs: {}, Batch size: {}, Training size: {}, Validation size: {}'.
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))

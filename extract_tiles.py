@@ -74,13 +74,13 @@ for i, name in enumerate(train_patient_names):
 
         # Create necessary padding in all 4 sides
         if verticalPadding % 2 != 0:
-            paddingTop = verticalPadding // 2
+            paddingTop = verticalPadding * random.random()
             paddingBottom = verticalPadding - paddingTop
         else:
             paddingTop, paddingBottom = verticalPadding // 2, verticalPadding // 2
 
         if horizontalPadding % 2 != 0:
-            paddingLeft = horizontalPadding // 2
+            paddingLeft = horizontalPadding * random.random()
             paddingRight = horizontalPadding - paddingLeft
         else:
             paddingLeft, paddingRight = horizontalPadding // 2, horizontalPadding // 2

@@ -7,6 +7,8 @@ from PIL import Image
 import os
 import torch
 from torchvision import transforms
+import torchvision.transforms.functional as TF
+import random
 from numpy import asarray
 
 class HuBMAPCropDataset(Dataset):
@@ -23,14 +25,14 @@ class HuBMAPCropDataset(Dataset):
             train_patients = pd.read_csv(base_dir + "/train.csv")
             leave_out_name = train_patients.iloc[options.test_tiff_value]['id']
             if mode == "train":
-                images = os.listdir(self.base_dir + "/ImgCrops")
-                masks = os.listdir(self.base_dir + "/maskCrops")
+                images = os.listdir(self.base_dir + "/images_256x256")
+                masks = os.listdir(self.base_dir + "/masks_256x256")
                 self.images = [x for x in images if leave_out_name not in x]
                 self.masks = [x for x in masks if leave_out_name not in x]
                 del images, masks
             elif mode == "val":
-                images = os.listdir(self.base_dir + "/ImgCrops")
-                masks = os.listdir(self.base_dir + "/maskCrops")
+                images = os.listdir(self.base_dir + "/images_256x256")
+                masks = os.listdir(self.base_dir + "/masks_256x256")
                 self.images = [x for x in images if leave_out_name in x]
                 self.masks = [x for x in masks if leave_out_name in x]
                 del images, masks
@@ -46,7 +48,7 @@ class HuBMAPCropDataset(Dataset):
                 self.slice_indexes = grid
             self.global_img = tiff_file
 
-    def make_grid(self, shape, window=512, min_overlap=0):
+    def make_grid(self, shape, window=256, min_overlap=0):
         # y = rows, x = cols
         y, x = shape
         nx = x // (window - min_overlap) + 1
@@ -70,16 +72,23 @@ class HuBMAPCropDataset(Dataset):
     def __getitem__(self, index):
         if self.mode == "train" or self.mode == "val":
             file_name = self.images[index]
-            img = Image.open(self.base_dir + "/ImgCrops/" + file_name)
-            mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
+            img = Image.open(self.base_dir + "/images_256x256/" + file_name)
+            mask = Image.open(self.base_dir + "/masks_256x256/" + file_name)
 
+            # Convert to tensor.
             img = transforms.ToTensor()(img)
             mask = transforms.ToTensor()(mask)
+
+            # # Merge two images.
+            # merged = torch.cat((img, mask), 0)
+            #
+            # # Random Crop
+            # crop = transforms.RandomCrop((512, 512), pad_if_needed=True).forward(merged)
+            #
+            # # Split them back.
+            # img = crop[:3, :, :]
+            # mask = crop[-1:, :, :]
             mask = mask * 255
-
-            img = transforms.Resize((512, 512), Image.BILINEAR)(img)
-            mask = transforms.Resize((512, 512), Image.BILINEAR)(mask)
-
             return img, mask
         elif self.mode == "test":
             coordinate = self.slice_indexes[index]
