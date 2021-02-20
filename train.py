@@ -19,10 +19,12 @@ from torchvision import transforms
 
 os.environ['CUDA_VISIBLE_DEVICES'] = options.cuda
 
+
 def log_string(out_str):
     LOG_FOUT.write(out_str + '\n')
     LOG_FOUT.flush()
     print(out_str)
+
 
 def rle_encode_less_memory(img):
     pixels = img.T.flatten()
@@ -32,24 +34,26 @@ def rle_encode_less_memory(img):
     runs[1::2] -= runs[::2]
     return ' '.join(str(x) for x in runs)
 
+
 def global_shift_mask(maskpred1, y_shift, x_shift):
     """
     applies a global shift to a mask by
     padding one side and cropping from the other
     """
-    if y_shift < 0 and x_shift >=0:
+    maskpred3 = None
+    if y_shift < 0 and x_shift >= 0:
         maskpred2 = np.pad(maskpred1,
-                           [(0,abs(y_shift)), (abs(x_shift), 0)],
+                           [(0, abs(y_shift)), (abs(x_shift), 0)],
                            mode='constant', constant_values=0)
         maskpred3 = maskpred2[abs(y_shift):, :maskpred1.shape[1]]
-    elif y_shift >=0 and x_shift <0:
+    elif y_shift >= 0 and x_shift < 0:
         maskpred2 = np.pad(maskpred1,
-                           [(abs(y_shift),0), (0, abs(x_shift))],
+                           [(abs(y_shift), 0), (0, abs(x_shift))],
                            mode='constant', constant_values=0)
         maskpred3 = maskpred2[:maskpred1.shape[0], abs(x_shift):]
-    elif y_shift >=0 and x_shift >=0:
+    elif y_shift >= 0 and x_shift >= 0:
         maskpred2 = np.pad(maskpred1,
-                           [(abs(y_shift),0), (abs(x_shift), 0)],
+                           [(abs(y_shift), 0), (abs(x_shift), 0)],
                            mode='constant', constant_values=0)
         maskpred3 = maskpred2[:maskpred1.shape[0], :maskpred1.shape[1]]
     elif y_shift < 0 and x_shift < 0:
@@ -61,7 +65,7 @@ def global_shift_mask(maskpred1, y_shift, x_shift):
 
 
 def get_dice_coeff(pred, targs):
-    '''
+    """
     Calculates the dice coeff of a single or batch of predicted mask and true masks.
 
     Args:
@@ -69,7 +73,7 @@ def get_dice_coeff(pred, targs):
         targs : Batch of true masks (b, w, h) or single true mask (w, h)
 
     Returns: Dice coeff over a batch or over a single pair.
-    '''
+    """
     pred = (pred > 0).float()
     return 2.0 * (pred * targs).sum() / ((pred + targs).sum() + 1.0)
 
@@ -91,6 +95,7 @@ class DiceLoss(nn.Module):
 
         return 1 - dice
 
+
 def train():
     log_string('lr is ' + str(options.lr))
 
@@ -111,10 +116,10 @@ def train():
             pred_mask_btch = model(slice_img)
 
             loss = criterion(pred_mask_btch, slice_mask)
-            #print("Loss",loss)
+            # print("Loss",loss)
             losses += loss.item()
-            #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
-            #dice_coeff_list += dice_coeff
+            # dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
+            # dice_coeff_list += dice_coeff
 
             optimizer.zero_grad()
             loss.backward()
@@ -130,6 +135,7 @@ def train():
         best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
         model.train()
 
+
 def evaluate(**kwargs):
     best_loss = kwargs['best_loss']
     best_acc = kwargs['best_acc']
@@ -144,21 +150,19 @@ def evaluate(**kwargs):
             pred_mask_btch = model(slice_img)
 
             loss = criterion(pred_mask_btch, slice_mask)
-            #print("Loss",loss)
+            # print("Loss",loss)
             val_loss += loss.item()
             val_acc += get_dice_coeff(pred_mask_btch, slice_mask)
 
-            #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
-            #dice_coeff_list += dice_coeff
+            # dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
+            # dice_coeff_list += dice_coeff
         val_loss = val_loss/(i+1)
         val_acc = val_acc/(i+1)
 
     # check for improvement
     loss_str, acc_str = '', ''
-    improved = False
     if val_loss <= best_loss:
         loss_str, best_loss = '(improved)', val_loss
-        improved = True
 
         # save checkpoint model
         state_dict = model.state_dict()
@@ -181,52 +185,6 @@ def evaluate(**kwargs):
     log_string('--' * 40)
     return best_loss, best_acc
 
-def predict():
-    subm = {}
-    all_files = os.listdir(BASE_DIR + "/testData")
-    patient_files = [x for x in all_files if '.tiff' in x]
-    for patient_file in patient_files:
-        name = patient_file[:-5]
-        log_string('--' * 40)
-        log_string("Predicting for patient: {}".format(name))
-        test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
-        test_loader = DataLoader(test_dataset, batch_size=options.batch_size,
-                                 shuffle=False, num_workers=options.workers, drop_last=False)
-        height, width = test_dataset.get_global_image_size()
-        global_mask = torch.zeros((height, width), dtype=torch.int8)
-        #global_mask = global_mask.to(device, dtype=torch.int8)
-        model.eval()
-        with torch.no_grad():
-            for i, data in enumerate(test_loader):
-                img_batch, coordinates_batch = data
-                img_batch = img_batch.to(device, dtype=torch.float)
-                coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
-                pred_mask_batch = model(img_batch)
-
-                # Converts mask to 0/1.
-                pred_mask_batch = (pred_mask_batch > options.threshold).type(torch.int8)
-                pred_mask_batch = pred_mask_batch * 255
-
-                # Loop through each img,mask in batch.
-                for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
-                    each_mask = torch.squeeze(each_mask)
-                    # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
-                    x1, x2, y1, y2 = coordinate
-                    global_mask[int(y1):int(y2),int(x1):int(x2)] = each_mask
-        global_mask = global_mask.numpy()
-
-        # Apply a shift on global mask.
-        global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
-        mask_img = Image.fromarray(global_mask)
-        mask_img.save(save_dir + "/predictions/{}_mask.png".format(name))
-        rle_pred = rle_encode_less_memory(global_mask)
-
-        subm[i] = {'id': name, 'predicted': rle_pred}
-        del global_mask, rle_pred
-        log_string("processed {}".format(name))
-    df_sub = pd.DataFrame(subm).T
-    df_sub.to_csv(save_dir + "/predictions/submission.csv", index=False)
-    log_string("Done Testing")
 
 if __name__ == '__main__':
     ##################################
@@ -289,7 +247,7 @@ if __name__ == '__main__':
 
     val_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="val")
     val_loader = DataLoader(val_dataset, batch_size=options.batch_size,
-                              shuffle=False, num_workers=options.workers, drop_last=False)
+                            shuffle=False, num_workers=options.workers, drop_last=False)
 
     ##################################
     # TRAINING

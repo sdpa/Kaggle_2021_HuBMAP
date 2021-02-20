@@ -1,12 +1,8 @@
-from torch.utils.data import Dataset
 import numpy as np
 import pandas as pd
 import tifffile as tiff
 from config import options
-import torch
-import os
-import cv2
-# import matplotlib.pyplot as plt
+from torch.utils.data import Dataset
 
 
 class HuBMAPDataset(Dataset):
