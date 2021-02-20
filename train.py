@@ -15,8 +15,9 @@ import pandas as pd
 from config import options
 import numpy as np
 from PIL import Image
+from torchvision import transforms
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = options.cuda
 
 def log_string(out_str):
     LOG_FOUT.write(out_str + '\n')
@@ -79,7 +80,7 @@ class DiceLoss(nn.Module):
 
     def forward(self, inputs, targets, smooth=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)
+        inputs = torch.sigmoid(inputs)
 
         # flatten label and prediction tensors
         inputs = inputs.view(-1)
@@ -95,10 +96,11 @@ def train():
 
     best_loss = 100
     best_acc = 0
-    global_step = 0
 
     model.train()
     losses = 0
+    count = 0
+    global_step = 0
     dice_coeff_list = []
     for epoch in range(options.epochs):
         log_string('**' * 40)
@@ -117,20 +119,21 @@ def train():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
+            count += 1
+            global_step += 1
             if (i + 1) % options.disp_freq == 0:
-                log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/(i + 1)))
+                log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/count))
                 losses = 0
-
-            if (i + 1) % options.val_freq == 0:
-                log_string('--' * 40)
-                log_string('Evaluating at step #{}'.format(i))
-                best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
-                model.train()
+                count = 0
+        log_string('--' * 40)
+        log_string('Evaluating at epoch #{}'.format(epoch+1))
+        best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
+        model.train()
 
 def evaluate(**kwargs):
     best_loss = kwargs['best_loss']
     best_acc = kwargs['best_acc']
+    global_step = kwargs['global_step']
     model.eval()
     val_loss = 0
     val_acc = 0
@@ -147,13 +150,29 @@ def evaluate(**kwargs):
 
             #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
             #dice_coeff_list += dice_coeff
-        val_loss = val_loss/(i + 1)
+        val_loss = val_loss/(i+1)
         val_acc = val_acc/(i+1)
 
     # check for improvement
     loss_str, acc_str = '', ''
+    improved = False
     if val_loss <= best_loss:
         loss_str, best_loss = '(improved)', val_loss
+        improved = True
+
+        # save checkpoint model
+        state_dict = model.state_dict()
+        for key in state_dict.keys():
+            state_dict[key] = state_dict[key].cpu()
+        save_path = os.path.join(model_dir, '{}.ckpt'.format(global_step))
+        torch.save({
+            'global_step': global_step,
+            'loss': val_loss,
+            'acc': val_acc,
+            'save_dir': model_dir,
+            'state_dict': state_dict},
+            save_path)
+        log_string('Model saved at: {}'.format(save_path))
     if val_acc >= best_acc:
         acc_str, best_acc = '(improved)', val_acc
     # display
@@ -175,15 +194,17 @@ def predict():
                                  shuffle=False, num_workers=options.workers, drop_last=False)
         height, width = test_dataset.get_global_image_size()
         global_mask = torch.zeros((height, width), dtype=torch.int8)
+        #global_mask = global_mask.to(device, dtype=torch.int8)
         model.eval()
         with torch.no_grad():
             for i, data in enumerate(test_loader):
                 img_batch, coordinates_batch = data
                 img_batch = img_batch.to(device, dtype=torch.float)
+                coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
                 pred_mask_batch = model(img_batch)
 
                 # Converts mask to 0/1.
-                pred_mask_batch = (pred_mask_batch > THRESHOLD).type(torch.int8)
+                pred_mask_batch = (pred_mask_batch > options.threshold).type(torch.int8)
                 pred_mask_batch = pred_mask_batch * 255
 
                 # Loop through each img,mask in batch.
@@ -191,11 +212,11 @@ def predict():
                     each_mask = torch.squeeze(each_mask)
                     # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
                     x1, x2, y1, y2 = coordinate
-                    global_mask[y1:y2,x1:x2] = each_mask
+                    global_mask[int(y1):int(y2),int(x1):int(x2)] = each_mask
         global_mask = global_mask.numpy()
 
         # Apply a shift on global mask.
-        global_mask = global_shift_mask(global_mask, Y_SHIFT, X_SHIFT)
+        global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
         mask_img = Image.fromarray(global_mask)
         mask_img.save(save_dir + "/predictions/{}_mask.png".format(name))
         rle_pred = rle_encode_less_memory(global_mask)
@@ -204,7 +225,7 @@ def predict():
         del global_mask, rle_pred
         log_string("processed {}".format(name))
     df_sub = pd.DataFrame(subm).T
-    df_sub.to_csv('submission.csv', index=False)
+    df_sub.to_csv(save_dir + "/predictions/submission.csv", index=False)
     log_string("Done Testing")
 
 if __name__ == '__main__':
@@ -273,11 +294,9 @@ if __name__ == '__main__':
     ##################################
     # TRAINING
     ##################################
-    THRESHOLD = 0.39
-    Y_SHIFT = -40
-    X_SHIFT = -24
     log_string('')
     log_string('Start training: Total epochs: {}, Batch size: {}, Training size: {}, Validation size: {}'.
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
-    #train()
+
+    train()
     predict()

@@ -6,6 +6,7 @@ import sys
 import tifffile as tiff
 import matplotlib.pyplot as plt
 from PIL import Image
+from random import random
 import cv2
 import math
 

@@ -3,11 +3,13 @@ from optparse import OptionParser
 
 parser = OptionParser()
 
-parser.add_option('-e', '--epochs', dest='epochs', default=200, type='int',
+parser.add_option('-c', '--cuda', dest='cuda', default='1', help='GPU to run on')
+
+parser.add_option('-e', '--epochs', dest='epochs', default=100, type='int',
                   help='number of epochs (default: 100)')
-parser.add_option('-b', '--batch-size', dest='batch_size', default=8, type='int',
+parser.add_option('-b', '--batch-size', dest='batch_size', default=16, type='int',
                   help='batch size (default: 16)')
-parser.add_option('--df', '--disp_freq', dest='disp_freq', default=150, type='int',
+parser.add_option('--df', '--disp_freq', dest='disp_freq', default=100, type='int',
                   help='frequency of displaying the training results (default: 100)')
 parser.add_option('--vf', '--val_freq', dest='val_freq', default=300, type='int',
                   help='run validation for each <val_freq> iterations (default: 2000)')
@@ -40,6 +42,23 @@ parser.add_option('--sd', '--save-dir', dest='save_dir', default='./save',
 
 parser.add_option('--loo', '--leave-one-out', dest='test_tiff_value', default=0,
                   help='Tiff file to remove from train and add to validation set')
+
+parser.add_option('--win', '--window', dest='window', default=256,
+                  help='Size of crops to be made from the large tiff file')
+
+# Mask options
+parser.add_option('--th', '--threshold', dest='threshold', default=0.39,
+                  help='Threshold of mask to convert values to 0/1 in the mask')
+
+parser.add_option('--y', '--y-shift', dest='y_shift', default=-40, type='int',
+                  help='Amount to shift global mask in y-direction')
+
+parser.add_option('--x', '--x-shift', dest='x_shift', default=-24, type='int',
+                  help='Amount to shift global mask in x-direction')
+
+# Augmentaion
+parser.add_option('--augh', '--aughard', dest='augment_hard', default=True,
+                  help='Whether to augment hard or not')
 
 
 options, _ = parser.parse_args()
