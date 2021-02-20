@@ -40,14 +40,14 @@ class HuBMAPCropDataset(Dataset):
             if len(tiff_file.shape) > 3:
                 tiff_file = tiff_file.squeeze(0).squeeze(0)
                 tiff_file = np.moveaxis(tiff_file, 0, -1)
-            grid = self.make_grid((tiff_file.shape[0], tiff_file.shape[1]), window=options.window)
+            grid = self.make_grid((tiff_file.shape[0], tiff_file.shape[1]), window=options.test_window)
             if len(self.slice_indexes) > 0:
                 self.slice_indexes = np.concatenate((self.slice_indexes, grid), axis=0)
             else:
                 self.slice_indexes = grid
             self.global_img = tiff_file
 
-    def make_grid(self, shape, window=options.window, min_overlap=0):
+    def make_grid(self, shape, window=options.test_window, min_overlap=0):
         # y = rows, x = cols
         y, x = shape
         nx = x // (window - min_overlap) + 1
@@ -82,7 +82,7 @@ class HuBMAPCropDataset(Dataset):
 
             merged = torch.cat((img, mask), 0)
 
-            crop = transforms.RandomCrop((options.window, options.window), pad_if_needed=True).forward(merged)
+            crop = transforms.RandomCrop((options.train_window, options.train_window), pad_if_needed=True).forward(merged)
             crop = transforms.RandomHorizontalFlip().forward(crop)
             crop = transforms.RandomVerticalFlip().forward(crop)
             crop = transforms.RandomRotation(90).forward(crop)
@@ -102,17 +102,7 @@ class HuBMAPCropDataset(Dataset):
             img = transforms.ToTensor()(img)
             mask = transforms.ToTensor()(mask)
 
-            merged = torch.cat((img, mask), 0)
-
-            crop = transforms.RandomCrop((options.window, options.window), pad_if_needed=True).forward(merged)
-
-            img = crop[:3, :, :]
-            mask = crop[-1:, :, :]
-
-            mask = mask * 255
-
             return img, mask
-
 
         elif self.mode == "test":
             coordinate = self.slice_indexes[index]

@@ -43,9 +43,6 @@ parser.add_option('--sd', '--save-dir', dest='save_dir', default='./save',
 parser.add_option('--loo', '--leave-one-out', dest='test_tiff_value', default=0,
                   help='Tiff file to remove from train and add to validation set')
 
-parser.add_option('--win', '--window', dest='window', default=256,
-                  help='Size of crops to be made from the large tiff file')
-
 # Mask options
 parser.add_option('--th', '--threshold', dest='threshold', default=0.39,
                   help='Threshold of mask to convert values to 0/1 in the mask')
@@ -55,6 +52,16 @@ parser.add_option('--y', '--y-shift', dest='y_shift', default=-40, type='int',
 
 parser.add_option('--x', '--x-shift', dest='x_shift', default=-24, type='int',
                   help='Amount to shift global mask in x-direction')
+
+# Window sizes for train, val, and test.
+parser.add_option('--tw', '--train-window', dest='train_window', default=256,
+                  help='Train on images on this size')
+
+parser.add_option('--vw', '--val-window', dest='val_window', default=1024,
+                  help='Validate on images of this size')
+
+parser.add_option('--tt', '--test-window', dest='test_window', default=1024,
+                  help='Test on images on this size')
 
 # Augmentaion
 parser.add_option('--augh', '--aughard', dest='augment_hard', default=True,
