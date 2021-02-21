@@ -17,7 +17,7 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 
-os.environ['CUDA_VISIBLE_DEVICES'] = options.cuda
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def log_string(out_str):
     LOG_FOUT.write(out_str + '\n')
@@ -102,15 +102,17 @@ def train():
     count = 0
     global_step = 0
     dice_coeff_list = []
+
     for epoch in range(options.epochs):
         log_string('**' * 40)
         log_string('Training Epoch %03d' % (epoch + 1))
         for i, data in enumerate(train_loader):
-            slice_img, slice_mask = data
-            slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
-            pred_mask_btch = model(slice_img)
+            # with torch.cuda.device(0):
+            img_batch, mask_batch = data
+            img_batch, mask_batch = img_batch.to(device, dtype=torch.float), mask_batch.to(device, dtype=torch.float)
+            pred_mask_batch = model(img_batch)
 
-            loss = criterion(pred_mask_btch, slice_mask)
+            loss = criterion(pred_mask_batch, mask_batch)
             #print("Loss",loss)
             losses += loss.item()
             #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
@@ -139,17 +141,14 @@ def evaluate(**kwargs):
     val_acc = 0
     with torch.no_grad():
         for i, data in enumerate(val_loader):
-            slice_img, slice_mask = data
-            slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
-            pred_mask_btch = model(slice_img)
+            img_batch, mask_batch = data
+            img_batch, mask_batch = img_batch.to(device, dtype=torch.float), mask_batch.to(device, dtype=torch.float)
+            pred_mask_batch = model(img_batch)
 
-            loss = criterion(pred_mask_btch, slice_mask)
-            #print("Loss",loss)
+            loss = criterion(pred_mask_batch, mask_batch)
             val_loss += loss.item()
-            val_acc += get_dice_coeff(pred_mask_btch, slice_mask)
+            val_acc += get_dice_coeff(pred_mask_batch, mask_batch)
 
-            #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
-            #dice_coeff_list += dice_coeff
         val_loss = val_loss/(i+1)
         val_acc = val_acc/(i+1)
 
@@ -185,17 +184,19 @@ def predict():
     subm = {}
     all_files = os.listdir(BASE_DIR + "/testData")
     patient_files = [x for x in all_files if '.tiff' in x]
+    best_model = os.listdir(model_dir)[-1]
+    model.load_state_dict(torch.load(save_dir + '/models/{}'.format(best_model)))
+    model.eval()
     for patient_file in patient_files:
         name = patient_file[:-5]
         log_string('--' * 40)
         log_string("Predicting for patient: {}".format(name))
         test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
-        test_loader = DataLoader(test_dataset, batch_size=options.batch_size,
+        test_loader = DataLoader(test_dataset, batch_size=8,
                                  shuffle=False, num_workers=options.workers, drop_last=False)
         height, width = test_dataset.get_global_image_size()
         global_mask = torch.zeros((height, width), dtype=torch.int8)
         #global_mask = global_mask.to(device, dtype=torch.int8)
-        model.eval()
         with torch.no_grad():
             for i, data in enumerate(test_loader):
                 img_batch, coordinates_batch = data
@@ -261,6 +262,7 @@ if __name__ == '__main__':
     # Create the model
     ##################################
     model = get_efficientunet_b2(out_channels=1, pretrained=False)
+
     # model = EfficientNet.from_pretrained('efficientnet-b2')
 
     log_string('{} model Generated.'.format(options.model))
@@ -299,4 +301,4 @@ if __name__ == '__main__':
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
 
     train()
-    predict()
+    #predict()

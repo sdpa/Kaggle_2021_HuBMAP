@@ -5,11 +5,11 @@ parser = OptionParser()
 
 parser.add_option('-c', '--cuda', dest='cuda', default='1', help='GPU to run on')
 
-parser.add_option('-e', '--epochs', dest='epochs', default=100, type='int',
+parser.add_option('-e', '--epochs', dest='epochs', default=150, type='int',
                   help='number of epochs (default: 100)')
 parser.add_option('-b', '--batch-size', dest='batch_size', default=16, type='int',
                   help='batch size (default: 16)')
-parser.add_option('--df', '--disp_freq', dest='disp_freq', default=100, type='int',
+parser.add_option('--df', '--disp_freq', dest='disp_freq', default=150, type='int',
                   help='frequency of displaying the training results (default: 100)')
 parser.add_option('--vf', '--val_freq', dest='val_freq', default=300, type='int',
                   help='run validation for each <val_freq> iterations (default: 2000)')
@@ -35,6 +35,9 @@ parser.add_option('--m', '--model', dest='model', default='efficientnet-b2',
                   help='vgg, inception, resnet, densenet (default: resnet)')
 parser.add_option('--lr', '--lr', dest='lr', default=0.001, type='float',
                   help='learning rate(default: 0.001)')
+parser.add_option('--lm', '--load_model', dest='load_model', default='/home/cougarnet.uh.edu/sdpatiba/Desktop/Kaggle_2021_HuBMAP/save/20210220_171241/models/15544.ckpt',
+                  help='Path to load the model')
+
 
 # For directories
 parser.add_option('--sd', '--save-dir', dest='save_dir', default='./save',
@@ -57,10 +60,10 @@ parser.add_option('--x', '--x-shift', dest='x_shift', default=-24, type='int',
 parser.add_option('--tw', '--train-window', dest='train_window', default=256,
                   help='Train on images on this size')
 
-parser.add_option('--vw', '--val-window', dest='val_window', default=1024,
+parser.add_option('--vw', '--val-window', dest='val_window', default=256,
                   help='Validate on images of this size')
 
-parser.add_option('--tt', '--test-window', dest='test_window', default=1024,
+parser.add_option('--tt', '--test-window', dest='test_window', default=512,
                   help='Test on images on this size')
 
 # Augmentaion

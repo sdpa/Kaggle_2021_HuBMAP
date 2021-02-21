@@ -102,6 +102,15 @@ class HuBMAPCropDataset(Dataset):
             img = transforms.ToTensor()(img)
             mask = transforms.ToTensor()(mask)
 
+            merged = torch.cat((img, mask), 0)
+            crop = transforms.RandomCrop((options.val_window, options.val_window), pad_if_needed=True).forward(merged)
+
+            # # Split them back.
+            img = crop[:3, :, :]
+            mask = crop[-1:, :, :]
+
+            mask = mask * 255
+
             return img, mask
 
         elif self.mode == "test":
