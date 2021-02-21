@@ -1,6 +1,7 @@
 256dataset/
 trainData/
 testData/
+predictions/
 save/
 .idea/
 __pycache__/

@@ -22,15 +22,13 @@ class HuBMAPCropDataset(Dataset):
             # Get all training patients.
             train_patients = pd.read_csv(base_dir + "/train.csv")
             leave_out_name = train_patients.iloc[options.test_tiff_value]['id']
+            images = os.listdir(self.base_dir + "/256dataset/images")
+            masks = os.listdir(self.base_dir + "/256dataset/masks")
             if mode == "train":
-                images = os.listdir(self.base_dir + "/256dataset/images")
-                masks = os.listdir(self.base_dir + "/256dataset/masks")
                 self.images = [x for x in images if leave_out_name not in x]
                 self.masks = [x for x in masks if leave_out_name not in x]
                 del images, masks
             elif mode == "val":
-                images = os.listdir(self.base_dir + "/ImgCrops")
-                masks = os.listdir(self.base_dir + "/maskCrops")
                 self.images = [x for x in images if leave_out_name in x]
                 self.masks = [x for x in masks if leave_out_name in x]
                 del images, masks
@@ -67,52 +65,56 @@ class HuBMAPCropDataset(Dataset):
         # Returns rows, columns
         return self.global_img.shape[0], self.global_img.shape[1]
 
-    def __getitem__(self, index):
-        if self.mode == "train":
-            file_name = self.images[index]
-            img = Image.open(self.base_dir + "/ImgCrops/" + file_name)
-            mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
-
-            img = transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=.05, saturation=.05).forward(img)
-            img = transforms.GaussianBlur(kernel_size=(3,3)).forward(img)
-
-            img = transforms.ToTensor()(img)
-            mask = transforms.ToTensor()(mask)
-
-            merged = torch.cat((img, mask), 0)
-
-            crop = transforms.RandomCrop((options.train_window, options.train_window), pad_if_needed=True).forward(merged)
-            crop = transforms.RandomHorizontalFlip().forward(crop)
-            crop = transforms.RandomVerticalFlip().forward(crop)
-            crop = transforms.RandomRotation(90).forward(crop)
-
-            # # Split them back.
-            img = crop[:3, :, :]
-            mask = crop[-1:, :, :]
-
-            mask = mask * 255
-
-            return img, mask
-        elif self.mode == "val":
-            file_name = self.images[index]
-            img = Image.open(self.base_dir + "/ImgCrops/" + file_name)
-            mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
-
-            img = transforms.ToTensor()(img)
-            mask = transforms.ToTensor()(mask)
-
-            return img, mask
-
-        elif self.mode == "test":
-            coordinate = self.slice_indexes[index]
-            x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
-            img = self.global_img[y1:y2,x1:x2,:]
-            coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
-            img = transforms.ToTensor()(img)
-            return img, coordinate
-
     def __len__(self):
         if self.mode == "train" or self.mode == 'val':
             return len(self.images)
         elif self.mode == "test":
             return len(self.slice_indexes)
+
+    def __getitem__(self, index):
+        if self.mode == "train":
+            file_name = self.images[index]
+            img = Image.open(self.base_dir + "/256dataset/images/" + file_name)
+            mask = Image.open(self.base_dir + "/256dataset/masks/" + file_name)
+            img = transforms.ToTensor()(img)
+            mask = transforms.ToTensor()(mask)
+
+            # img = transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=.05, saturation=.05).forward(img)
+            # img = transforms.GaussianBlur(kernel_size=(3, 3)).forward(img)
+
+            # Concatenate mask and image to apply same transformations
+            merged = torch.cat((img, mask), 0)  # ToDo: Find better way to apply transformations to both image and mask
+
+            transform = transforms.Compose([
+                transforms.RandomCrop((options.train_window, options.train_window), pad_if_needed=True),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomRotation(90)
+            ])
+
+            crop = transform(merged)
+
+            # # Split them back.
+            img = crop[:3, :, :]
+            mask = crop[-1:, :, :]
+            mask = mask * 255   # ToDo: Ideally shouldn't use ToTensor on masks because it scales [0,1]
+
+            return img, mask
+        elif self.mode == "val":
+            file_name = self.images[index]
+            img = Image.open(self.base_dir + "/256dataset/images/" + file_name)
+            mask = Image.open(self.base_dir + "/256dataset/masks/" + file_name)
+
+            img = transforms.ToTensor()(img)
+            mask = transforms.ToTensor()(mask)
+            mask = mask * 255
+
+            return img, mask
+        elif self.mode == "test":
+            coordinate = self.slice_indexes[index]
+            x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
+            img = self.global_img[y1:y2, x1:x2, :]
+            coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
+            img = transforms.ToTensor()(img)
+
+            return img, coordinate

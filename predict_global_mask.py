@@ -2,15 +2,16 @@ import os
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-from torch.utils.data import DataLoader
 from datetime import datetime
+from torch.utils.data import DataLoader
 from HuBMAPCropDataset import HuBMAPCropDataset
-from models.EfficientUnet.efficientnet import EfficientNet
 from models.EfficientUnet.efficient_unet import *
 import pandas as pd
 from config import options
 import numpy as np
 from PIL import Image
+
+os.environ['CUDA_VISIBLE_DEVICES'] = "{}".format(options.gpu)
 
 
 def rle_encode_less_memory(img):
@@ -88,14 +89,14 @@ def predict():
         # Apply a shift on global mask.
         global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
         mask_img = Image.fromarray(global_mask)
-        mask_img.save(BASE_DIR + "/predictions/{}_mask.png".format(name))
+        mask_img.save(predictions_dir + "/{}_mask.png".format(name))
         rle_pred = rle_encode_less_memory(global_mask)
 
         subm[i] = {'id': name, 'predicted': rle_pred}
         del global_mask, rle_pred
         print("processed {}".format(name))
     df_sub = pd.DataFrame(subm).T
-    df_sub.to_csv(BASE_DIR + "/predictions/submission.csv", index=False)
+    df_sub.to_csv(predictions_dir + "/submission.csv", index=False)
     print("Done Testing")
 
 
@@ -109,8 +110,10 @@ if __name__ == '__main__':
     predictions_dir = os.path.join(BASE_DIR, 'predictions')
     if not os.path.exists(predictions_dir):
         os.makedirs(predictions_dir)
+    predictions_dir = os.path.join(predictions_dir, datetime.now().strftime('%Y%m%d_%H%M%S'))
+    os.makedirs(predictions_dir)
 
-    os.system('cp {}/train.py {}'.format(BASE_DIR, predictions_dir))
+    os.system('cp {}/predict_global_mask.py {}'.format(BASE_DIR, predictions_dir))
     os.system('cp {}/HuBMAPCropDataset.py {}'.format(BASE_DIR, predictions_dir))
 
     ##################################
@@ -129,14 +132,20 @@ if __name__ == '__main__':
     model.cuda()
     model = nn.DataParallel(model)
 
+    #################################
+    # Load checkpoint
+    ##################################
+    state_dict = torch.load(options.load_model)
+    model.load_state_dict(state_dict)
+
     ##################################
     # Load dataset
     ##################################
-    train_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="train")
+    train_dataset = HuBMAPCropDataset(BASE_DIR, mode="train")
     train_loader = DataLoader(train_dataset, batch_size=options.batch_size,
                               shuffle=True, num_workers=options.workers, drop_last=False)
 
-    val_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="val")
+    val_dataset = HuBMAPCropDataset(BASE_DIR, mode="val")
     val_loader = DataLoader(val_dataset, batch_size=options.batch_size,
                             shuffle=False, num_workers=options.workers, drop_last=False)
 

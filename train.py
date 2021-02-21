@@ -2,22 +2,16 @@ import os
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from datetime import datetime
 
-import tifffile as tiff
 from HuBMAPCropDataset import HuBMAPCropDataset
-from models.EfficientUnet.efficientnet import EfficientNet
 from models.EfficientUnet.efficient_unet import *
-import pandas as pd
 from config import options
 import numpy as np
-from PIL import Image
-from torchvision import transforms
 
-os.environ['CUDA_VISIBLE_DEVICES'] = options.cuda
+os.environ['CUDA_VISIBLE_DEVICES'] = "{}".format(options.gpu)
 
 
 def log_string(out_str):
@@ -106,7 +100,6 @@ def train():
     losses = 0
     count = 0
     global_step = 0
-    dice_coeff_list = []
     for epoch in range(options.epochs):
         log_string('**' * 40)
         log_string('Training Epoch %03d' % (epoch + 1))
@@ -115,11 +108,8 @@ def train():
             slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
             pred_mask_btch = model(slice_img)
 
-            loss = criterion(pred_mask_btch, slice_mask)
-            # print("Loss",loss)
+            loss = criterion(pred_mask_btch, slice_mask)  # Slice mask is 1s and 0s, correct
             losses += loss.item()
-            # dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
-            # dice_coeff_list += dice_coeff
 
             optimizer.zero_grad()
             loss.backward()
@@ -143,42 +133,39 @@ def evaluate(**kwargs):
     model.eval()
     val_loss = 0
     val_acc = 0
+    n_batches = 0
     with torch.no_grad():
         for i, data in enumerate(val_loader):
+            n_batches += 1
             slice_img, slice_mask = data
             slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
             pred_mask_btch = model(slice_img)
 
             loss = criterion(pred_mask_btch, slice_mask)
-            # print("Loss",loss)
             val_loss += loss.item()
             val_acc += get_dice_coeff(pred_mask_btch, slice_mask)
 
-            # dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
-            # dice_coeff_list += dice_coeff
-        val_loss = val_loss/(i+1)
-        val_acc = val_acc/(i+1)
+        val_loss = val_loss/(n_batches + 1)
+        val_acc = val_acc/(n_batches + 1)
 
     # check for improvement
     loss_str, acc_str = '', ''
+    improved = False
     if val_loss <= best_loss:
         loss_str, best_loss = '(improved)', val_loss
+        improved = True
+    if val_acc >= best_acc:
+        acc_str, best_acc = '(improved)', val_acc
 
+    if improved:
         # save checkpoint model
         state_dict = model.state_dict()
         for key in state_dict.keys():
             state_dict[key] = state_dict[key].cpu()
         save_path = os.path.join(model_dir, '{}.ckpt'.format(global_step))
-        torch.save({
-            'global_step': global_step,
-            'loss': val_loss,
-            'acc': val_acc,
-            'save_dir': model_dir,
-            'state_dict': state_dict},
-            save_path)
+        torch.save(state_dict, save_path)
         log_string('Model saved at: {}'.format(save_path))
-    if val_acc >= best_acc:
-        acc_str, best_acc = '(improved)', val_acc
+
     # display
     log_string("validation_loss: {0:.4f} {1}".format(val_loss, loss_str))
     log_string("validation_accuracy: {0:.4f} {1}".format(val_acc, acc_str))
@@ -200,17 +187,14 @@ if __name__ == '__main__':
     os.makedirs(save_dir)
 
     LOG_FOUT = open(os.path.join(save_dir, 'log_train.txt'), 'w')
-    LOG_FOUT.write(str(options) + '\n')
-    print(str(options) + '\n')
+    log_string('Options:')
+    for key, val in options.__dict__.items():
+        log_string(key + ": " + str(val))
 
     model_dir = os.path.join(save_dir, 'models')
     logs_dir = os.path.join(save_dir, 'tf_logs')
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-
-    predictions_dir = os.path.join(save_dir, 'predictions')
-    if not os.path.exists(predictions_dir):
-        os.makedirs(predictions_dir)
 
     os.system('cp {}/train.py {}'.format(BASE_DIR, save_dir))
     os.system('cp {}/HuBMAPCropDataset.py {}'.format(BASE_DIR, save_dir))
@@ -241,11 +225,11 @@ if __name__ == '__main__':
     ##################################
     # os.system('cp {}/dataset/dataset.py {}'.format(BASE_DIR, save_dir))
 
-    train_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="train")
+    train_dataset = HuBMAPCropDataset(BASE_DIR, mode="train")
     train_loader = DataLoader(train_dataset, batch_size=options.batch_size,
                               shuffle=True, num_workers=options.workers, drop_last=False)
 
-    val_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="val")
+    val_dataset = HuBMAPCropDataset(BASE_DIR, mode="val")
     val_loader = DataLoader(val_dataset, batch_size=options.batch_size,
                             shuffle=False, num_workers=options.workers, drop_last=False)
 
@@ -257,4 +241,21 @@ if __name__ == '__main__':
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
 
     train()
-    predict()
+
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+
+target_mask = slice_mask[0]
+target_mask = np.array(target_mask.cpu().detach())
+target_mask = np.moveaxis(target_mask, 0, -1)
+plt.imshow(target_mask)
+plt.show()
+
+predicted_mask = pred_mask_btch[0]
+predicted_mask = (predicted_mask > 0.39).type(torch.int8)
+predicted_mask = np.array(predicted_mask.cpu().detach())
+predicted_mask = np.moveaxis(predicted_mask, 0, -1)
+plt.imshow(predicted_mask)
+plt.show()
+"""
