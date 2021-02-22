@@ -3,6 +3,8 @@ ImgCrops/
 trainData/
 testData/
 save/
+256dataset/
+predictions/
 .idea/
 __pycache__/
 qdphm_1/
