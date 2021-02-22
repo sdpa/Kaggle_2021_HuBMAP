@@ -56,38 +56,40 @@ def predict():
     subm = {}
     all_files = os.listdir(BASE_DIR + "/testData")
     patient_files = [x for x in all_files if '.tiff' in x]
+    model.eval()
     for patient_file in patient_files:
         name = patient_file[:-5]
         print('--' * 40)
         print("Predicting for patient: {}".format(name))
         test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
-        test_loader = DataLoader(test_dataset, batch_size=options.batch_size,
+        test_loader = DataLoader(test_dataset, batch_size=4,
                                  shuffle=False, num_workers=options.workers, drop_last=False)
         height, width = test_dataset.get_global_image_size()
         global_mask = torch.zeros((height, width), dtype=torch.int8)
         # global_mask = global_mask.to(device, dtype=torch.int8)
-        model.eval()
         with torch.no_grad():
             for i, data in enumerate(test_loader):
                 img_batch, coordinates_batch = data
                 img_batch = img_batch.to(device, dtype=torch.float)
                 coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
-                pred_mask_batch = model(img_batch)
+                pred_mask_batch = model(img_batch)  # pred_mask_btch: [-22.1122, -11.132393 ,....]
+                pred_mask_batch = torch.sigmoid(pred_mask_batch)  # goes to [0, 1]
 
                 # Converts mask to 0/1.
                 pred_mask_batch = (pred_mask_batch > options.threshold).type(torch.int8)
-                pred_mask_batch = pred_mask_batch * 255
+                # pred_mask_batch = pred_mask_batch * 255
 
                 # Loop through each img,mask in batch.
                 for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
                     each_mask = torch.squeeze(each_mask)
                     # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
                     x1, x2, y1, y2 = coordinate
-                    global_mask[int(y1):int(y2), int(x1):int(x2)] = each_mask
+                    global_mask[int(y1):int(y2),int(x1):int(x2)] = each_mask
         global_mask = global_mask.numpy()
 
-        # Apply a shift on global mask.
-        global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
+        # Apply a shift on global mask IF image is afa5e8098.
+        if name == 'afa5e8098':
+            global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
         mask_img = Image.fromarray(global_mask)
         mask_img.save(predictions_dir + "/{}_mask.png".format(name))
         rle_pred = rle_encode_less_memory(global_mask)
@@ -139,19 +141,28 @@ if __name__ == '__main__':
     model.load_state_dict(state_dict)
 
     ##################################
-    # Load dataset
-    ##################################
-    train_dataset = HuBMAPCropDataset(BASE_DIR, mode="train")
-    train_loader = DataLoader(train_dataset, batch_size=options.batch_size,
-                              shuffle=True, num_workers=options.workers, drop_last=False)
-
-    val_dataset = HuBMAPCropDataset(BASE_DIR, mode="val")
-    val_loader = DataLoader(val_dataset, batch_size=options.batch_size,
-                            shuffle=False, num_workers=options.workers, drop_last=False)
-
-    ##################################
     # PREDICTING
     ##################################
     print('')
     print('Starting Predictions on Global Mask')
     predict()
+
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+
+img_batch.sum()
+
+pred_mask_batch.sum()
+
+for i in range(4):
+    plt.imshow(np.moveaxis(img_batch[i].cpu().detach().numpy(), 0, -1))
+    plt.show()
+
+predicted_mask = pred_mask_batch[0]
+predicted_mask = (predicted_mask > 0.39).type(torch.int8)
+predicted_mask = np.array(predicted_mask.cpu().detach())
+predicted_mask = np.moveaxis(predicted_mask, 0, -1)
+plt.imshow(predicted_mask)
+plt.show()
+"""

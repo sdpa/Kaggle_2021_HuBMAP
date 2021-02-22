@@ -3,7 +3,7 @@ from optparse import OptionParser
 
 parser = OptionParser()
 
-parser.add_option('-g', '--gpu', dest='gpu', default=0, help='GPU to run on')
+parser.add_option('-g', '--gpu', dest='gpu', default=2, help='GPU to run on')
 
 parser.add_option('-e', '--epochs', dest='epochs', default=100, type='int',
                   help='number of epochs (default: 100)')
@@ -47,17 +47,17 @@ parser.add_option('--loo', '--leave-one-out', dest='test_tiff_value', default=0,
 parser.add_option('--th', '--threshold', dest='threshold', default=0.39,
                   help='Threshold of mask to convert values to 0/1 in the mask')
 
-parser.add_option('--y', '--y-shift', dest='y_shift', default=0, type='int',
+parser.add_option('--y', '--y-shift', dest='y_shift', default=-40, type='int',
                   help='Amount to shift global mask in y-direction')  # -42
 
-parser.add_option('--x', '--x-shift', dest='x_shift', default=0, type='int',
+parser.add_option('--x', '--x-shift', dest='x_shift', default=-24, type='int',
                   help='Amount to shift global mask in x-direction')  # -20
 
 # Window sizes for train, val, and test.
 parser.add_option('--tw', '--train-window', dest='train_window', default=256,
                   help='Train on images on this size')
 
-parser.add_option('--vw', '--val-window', dest='val_window', default=1024,
+parser.add_option('--vw', '--val-window', dest='val_window', default=256,
                   help='Validate on images of this size')
 
 parser.add_option('--tt', '--test-window', dest='test_window', default=512,
@@ -68,7 +68,7 @@ parser.add_option('--augh', '--aughard', dest='augment_hard', default=True,
                   help='Whether to augment hard or not')
 
 # For Testing
-parser.add_option('--load-model', dest='load_model', default='./save/20210220_130939/models/6510.ckpt',
+parser.add_option('--load-model', dest='load_model', default='./save/20210222_092535/models/7560.ckpt',
                   help='Model checkpoint to load for global mask prediction')
 
 

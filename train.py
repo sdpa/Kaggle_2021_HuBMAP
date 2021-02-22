@@ -68,6 +68,7 @@ def get_dice_coeff(pred, targs):
 
     Returns: Dice coeff over a batch or over a single pair.
     """
+    # pred = torch.sigmoid(pred)  # Squash predictions to [0, 1] like in DiceLoss
     pred = (pred > 0).float()
     return 2.0 * (pred * targs).sum() / ((pred + targs).sum() + 1.0)
 
@@ -94,7 +95,7 @@ def train():
     log_string('lr is ' + str(options.lr))
 
     best_loss = 100
-    best_acc = 0
+    best_dice_score = 0
 
     model.train()
     losses = 0
@@ -104,7 +105,7 @@ def train():
         log_string('**' * 40)
         log_string('Training Epoch %03d' % (epoch + 1))
         for i, data in enumerate(train_loader):
-            slice_img, slice_mask = data
+            slice_img, slice_mask = data  # Dataloader is working correctly, masks come through as 0s/1s, imgs float #s
             slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
             pred_mask_btch = model(slice_img)
 
@@ -122,20 +123,22 @@ def train():
                 count = 0
         log_string('--' * 40)
         log_string('Evaluating at epoch #{}'.format(epoch+1))
-        best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
+        best_loss, best_dice_score = evaluate(best_loss=best_loss, best_dice_score=best_dice_score,
+                                              global_step=global_step)
         model.train()
 
 
 def evaluate(**kwargs):
     best_loss = kwargs['best_loss']
-    best_acc = kwargs['best_acc']
+    best_dice_score = kwargs['best_dice_score']
     global_step = kwargs['global_step']
     model.eval()
     val_loss = 0
-    val_acc = 0
+    dice_score = 0
     n_batches = 0
     with torch.no_grad():
         for i, data in enumerate(val_loader):
+            # Validation dataloader working correctly. Predictions on val images are fairly good
             n_batches += 1
             slice_img, slice_mask = data
             slice_img, slice_mask = slice_img.to(device, dtype=torch.float), slice_mask.to(device, dtype=torch.float)
@@ -143,10 +146,10 @@ def evaluate(**kwargs):
 
             loss = criterion(pred_mask_btch, slice_mask)
             val_loss += loss.item()
-            val_acc += get_dice_coeff(pred_mask_btch, slice_mask)
+            dice_score += get_dice_coeff(pred_mask_btch, slice_mask)
 
         val_loss = val_loss/(n_batches + 1)
-        val_acc = val_acc/(n_batches + 1)
+        dice_score = dice_score/(n_batches + 1)
 
     # check for improvement
     loss_str, acc_str = '', ''
@@ -154,8 +157,8 @@ def evaluate(**kwargs):
     if val_loss <= best_loss:
         loss_str, best_loss = '(improved)', val_loss
         improved = True
-    if val_acc >= best_acc:
-        acc_str, best_acc = '(improved)', val_acc
+    if dice_score >= best_dice_score:
+        acc_str, best_dice_score = '(improved)', dice_score
 
     if improved:
         # save checkpoint model
@@ -168,9 +171,9 @@ def evaluate(**kwargs):
 
     # display
     log_string("validation_loss: {0:.4f} {1}".format(val_loss, loss_str))
-    log_string("validation_accuracy: {0:.4f} {1}".format(val_acc, acc_str))
+    log_string("dice score: {0:.4f} {1}".format(dice_score, acc_str))
     log_string('--' * 40)
-    return best_loss, best_acc
+    return best_loss, best_dice_score
 
 
 if __name__ == '__main__':
@@ -246,16 +249,13 @@ if __name__ == '__main__':
 import numpy as np
 import matplotlib.pyplot as plt
 
-target_mask = slice_mask[0]
-target_mask = np.array(target_mask.cpu().detach())
-target_mask = np.moveaxis(target_mask, 0, -1)
-plt.imshow(target_mask)
+plt.imshow(np.moveaxis(slice_mask[0].cpu().detach().numpy(), 0, -1))
+
+plt.imshow(np.moveaxis(slice_img[0].cpu().detach().numpy(), 0, -1))
 plt.show()
 
-predicted_mask = pred_mask_btch[0]
-predicted_mask = (predicted_mask > 0.39).type(torch.int8)
-predicted_mask = np.array(predicted_mask.cpu().detach())
-predicted_mask = np.moveaxis(predicted_mask, 0, -1)
-plt.imshow(predicted_mask)
+prediction = pred_mask_btch[0].cpu().detach().numpy()
+prediction_mask = (prediction > 0.4).astype(np.uint8)
+plt.imshow(np.moveaxis(prediction_mask, 0, -1))
 plt.show()
 """
