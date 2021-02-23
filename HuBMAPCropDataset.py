@@ -7,7 +7,7 @@ from config import options
 import os
 import torch
 from torchvision import transforms
-import cv2
+# import cv2
 from PIL import Image
 
 class HuBMAPCropDataset(Dataset):
@@ -23,15 +23,13 @@ class HuBMAPCropDataset(Dataset):
             # Get all training patients.
             train_patients = pd.read_csv(base_dir + "/train.csv")
             leave_out_name = train_patients.iloc[options.test_tiff_value]['id']
+            images = os.listdir(self.base_dir + "/data/ImgCrops")
+            masks = os.listdir(self.base_dir + "/data/maskCrops")
             if mode == "train":
-                images = os.listdir(self.base_dir + "/ImgCrops")
-                masks = os.listdir(self.base_dir + "/maskCrops")
                 self.images = [x for x in images if leave_out_name not in x]
                 self.masks = [x for x in masks if leave_out_name not in x]
                 del images, masks
             elif mode == "val":
-                images = os.listdir(self.base_dir + "/ImgCrops")
-                masks = os.listdir(self.base_dir + "/maskCrops")
                 self.images = [x for x in images if leave_out_name in x]
                 self.masks = [x for x in masks if leave_out_name in x]
                 del images, masks
@@ -71,8 +69,8 @@ class HuBMAPCropDataset(Dataset):
     def __getitem__(self, index):
         if self.mode == "train":
             file_name = self.images[index]
-            img = Image.open(self.base_dir + "/ImgCrops/" + file_name)
-            mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
+            img = Image.open(self.base_dir + "/data/ImgCrops/" + file_name)
+            mask = Image.open(self.base_dir + "/data/maskCrops/" + file_name)
 
             img = transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=.05, saturation=.05).forward(img)
             img = transforms.GaussianBlur(kernel_size=(3,3)).forward(img)

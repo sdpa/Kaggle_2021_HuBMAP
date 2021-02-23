@@ -3,7 +3,7 @@ from optparse import OptionParser
 
 parser = OptionParser()
 
-parser.add_option('-c', '--cuda', dest='cuda', default='1', help='GPU to run on')
+parser.add_option('-g', '--gpu', dest='gpu', default=3, help='GPU to run on')
 
 parser.add_option('-e', '--epochs', dest='epochs', default=150, type='int',
                   help='number of epochs (default: 100)')
@@ -27,7 +27,7 @@ parser.add_option('--ic', '--img_c', dest='img_c', default=3, type='int',
                   help='number of input channels (default: 3)')
 
 # Classes
-parser.add_option('--nc', '--num_classes', dest='num_classes', default=2, type='int',
+parser.add_option('--nc', '--num_classes', dest='num_classes', default=1, type='int',
                   help='number of classes (default: 5)')
 
 # For model
@@ -35,7 +35,8 @@ parser.add_option('--m', '--model', dest='model', default='efficientnet-b2',
                   help='vgg, inception, resnet, densenet (default: resnet)')
 parser.add_option('--lr', '--lr', dest='lr', default=0.001, type='float',
                   help='learning rate(default: 0.001)')
-parser.add_option('--lm', '--load_model', dest='load_model', default='/home/cougarnet.uh.edu/sdpatiba/Desktop/Kaggle_2021_HuBMAP/save/20210220_171241/models/15544.ckpt',
+parser.add_option('--lm', '--load_model', dest='load_model',
+                  default='/home/cougarnet.uh.edu/sdpatiba/Desktop/Kaggle_2021_HuBMAP/save/20210220_171241/models/15544.ckpt',
                   help='Path to load the model')
 
 

@@ -1,6 +1,10 @@
 maskCrops/
 ImgCrops/
 trainData/
+data/
+logs/
+runs/
+checkpoints/
 testData/
 save/
 256dataset/

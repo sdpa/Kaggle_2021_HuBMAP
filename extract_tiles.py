@@ -6,8 +6,8 @@ import sys
 import tifffile as tiff
 import matplotlib.pyplot as plt
 from PIL import Image
-from random import random
-import cv2
+import random
+# import cv2
 import math
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -75,13 +75,13 @@ for i, name in enumerate(train_patient_names):
 
         # Create necessary padding in all 4 sides
         if verticalPadding % 2 != 0:
-            paddingTop = verticalPadding * random.random()
+            paddingTop = int(verticalPadding * random.random())
             paddingBottom = verticalPadding - paddingTop
         else:
             paddingTop, paddingBottom = verticalPadding // 2, verticalPadding // 2
 
         if horizontalPadding % 2 != 0:
-            paddingLeft = horizontalPadding * random.random()
+            paddingLeft = int(horizontalPadding * random.random())
             paddingRight = horizontalPadding - paddingLeft
         else:
             paddingLeft, paddingRight = horizontalPadding // 2, horizontalPadding // 2
@@ -96,14 +96,14 @@ for i, name in enumerate(train_patient_names):
         mask_crop = global_mask[new_y1:new_y2, new_x1:new_x2]
 
         im = Image.fromarray(img_crop)
-        im.save(BASE_DIR + "/ImgCrops/{}_{}_{}.png".format(name, new_x1, new_y1))
+        im.save(BASE_DIR + "/data/ImgCrops/{}_{}_{}.png".format(name, new_x1, new_y1))
 
         im = Image.fromarray(mask_crop)
-        im.save(BASE_DIR + "/maskCrops/{}_{}_{}.png".format(name, new_x1, new_y1))
+        im.save(BASE_DIR + "/data/maskCrops/{}_{}_{}.png".format(name, new_x1, new_y1))
 
 
-images_count = len(os.listdir(BASE_DIR+"/ImgCrops"))
-mask_count = len(os.listdir(BASE_DIR+"/maskCrops"))
+images_count = len(os.listdir(BASE_DIR+"/data/ImgCrops"))
+mask_count = len(os.listdir(BASE_DIR+"/data/maskCrops"))
 print('Images count: ', images_count)
 print('Masks count: ', mask_count)
 print('Done padding')

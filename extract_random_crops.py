@@ -7,7 +7,7 @@ import tifffile as tiff
 import matplotlib.pyplot as plt
 from PIL import Image
 import random
-import cv2
+# import cv2
 import math
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,6 +28,8 @@ def rle_to_mask(_encoding, size):
 
 
 largest = [0, 0]
+length = len(os.listdir(BASE_DIR + '/data/ImgCrops'))//len(train_patient_names)
+print("Length div num tiffs:", length)
 for i, name in enumerate(train_patient_names):
     print(name)
     img = tiff.imread(BASE_DIR + "/trainData/" + name + ".tiff")
@@ -46,8 +48,6 @@ for i, name in enumerate(train_patient_names):
     x = img.shape[1] - 1024
     y = img.shape[0] - 1024
 
-    length = len(os.listdir(BASE_DIR + '/trainData/ImgCrops'))//len(train_patient_names)
-
     for j in range(length):
         x1 = random.randint(0,x)
         x2 = x1 + 1024
@@ -59,10 +59,10 @@ for i, name in enumerate(train_patient_names):
         mask_crop = global_mask[y1:y2, x1:x2]
 
         im = Image.fromarray(img_crop)
-        im.save(BASE_DIR + "/trainData/ImgCrops/{}_{}_{}.png".format(name, x1, y1))
+        im.save(BASE_DIR + "/data/ImgCrops/{}_{}_{}.png".format(name, x1, y1))
 
         im = Image.fromarray(mask_crop)
-        im.save(BASE_DIR + "/trainData/maskCrops/{}_{}_{}.png".format(name, x1, y1))
+        im.save(BASE_DIR + "/data/maskCrops/{}_{}_{}.png".format(name, x1, y1))
 
 print('Success!!')
 
