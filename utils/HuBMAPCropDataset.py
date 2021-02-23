@@ -117,17 +117,16 @@ class HuBMAPCropDataset(Dataset):
             img, mask = aug_arr[0], aug_arr[1]
 
             # Image normalization
-            img = np.asarray(img)
+            img = np.array(img)
             if img.max() != img.min():
                 img = (img - img.min()) / (img.max() - img.min())
             # img = Image.fromarray((img * 255).astype('uint8'))
-            img = img * 255
 
             # img = np.array(img)
             img = np.moveaxis(img, -1, 0)
             mask = np.array(mask)
 
-            return {'image': torch.from_numpy(img), 'mask': torch.from_numpy(mask).unsqueeze(0)}
+            return {'image': torch.Tensor(img), 'mask': torch.Tensor(mask).unsqueeze(0)}
 
             # img = transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=.05, saturation=.05).forward(img)
             # img = transforms.GaussianBlur(kernel_size=(3,3)).forward(img)
@@ -147,14 +146,15 @@ class HuBMAPCropDataset(Dataset):
         elif self.mode == "val":
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
-            img = self.global_img[y1:y2, x1:x2, :]
-            mask = self.global_mask[y1:y2, x1:x2]
+            img = self.global_img[y1:y2, x1:x2, :]  # (512, 512, 3)
+            mask = self.global_mask[y1:y2, x1:x2]  # (512, 512)
+            mask = np.expand_dims(mask, axis=2)  # (512,512) -> (512,512,1)
 
-            img = transforms.ToTensor()(img)
-            mask = transforms.ToTensor()(mask) * 255
+            img = transforms.ToTensor()(img)  # [3, 512, 512]
+            mask = transforms.ToTensor()(mask) * 255  # [1, 512, 512]
             coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
 
-            return {'image': img, 'global_mask': mask, 'coords': coordinate}
+            return {'image': img, 'mask': mask, 'coords': coordinate}
 
         elif self.mode == "test":
             coordinate = self.slice_indexes[index]

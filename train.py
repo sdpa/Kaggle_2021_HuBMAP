@@ -87,13 +87,14 @@ def train_net():
         net.train()
         epoch_loss = 0
 
-        for batch in train_loader:
+        for i, batch in enumerate(train_loader):
+            # print('Batch', i)
             imgs = batch['image']
             true_masks = batch['mask']
-            assert imgs.shape[1] == options.n_channels, \
-                f'Network has been defined with {options.n_channels} input channels, ' \
-                f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
-                'the images are loaded correctly.'
+            # assert imgs.shape[1] == options.n_channels, \
+            #     f'Network has been defined with {options.n_channels} input channels, ' \
+            #     f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
+            #     'the images are loaded correctly.'
 
             imgs = imgs.to(device=device, dtype=torch.float32)
             mask_type = torch.float32 if options.n_classes == 1 else torch.long
@@ -154,9 +155,9 @@ def train_net():
                 improved = False
                 if val_score <= best_loss:
                     loss_str, best_loss = '(improved)', val_score
-                    improved = True
                 if global_dice_score >= best_acc:  # Using dice coefficient on global mask as accuracy
                     acc_str, best_acc = '(improved)', global_dice_score
+                    improved = True
 
                 log_string('Validation time: {0:.4f}'.format(eval_end - eval_start))
                 log_string("Val Loss: {0:.2f} {1}, Global Dice Score: {2:.3f} {3}, "
@@ -337,7 +338,7 @@ if __name__ == '__main__':
         train_net()
 
     except KeyboardInterrupt:
-        torch.save(net.state_dict(), dir_checkpoint + dt_save + file_naming + '/' + 'INTERRUPTED.pth')
+        # torch.save(net.state_dict(), dir_checkpoint + dt_save + file_naming + '/' + 'INTERRUPTED.pth')
         log_string('Saved interrupt')
         try:
             sys.exit(0)

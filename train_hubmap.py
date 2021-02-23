@@ -206,7 +206,7 @@ if __name__ == '__main__':
         os.makedirs(predictions_dir)
 
     os.system('cp {}/train.py {}'.format(BASE_DIR, save_dir))
-    os.system('cp {}/HuBMAPCropDataset.py {}'.format(BASE_DIR, save_dir))
+    os.system('cp {}/utils/HuBMAPCropDataset.py {}'.format(BASE_DIR, save_dir))
 
     ##################################
     # Create the model

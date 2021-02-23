@@ -9,9 +9,9 @@ parser.add_option('--ar', '--arch', dest='arch', type=str, default='efficientnet
                          'PanDeepLabx71, or HRNetM')
 parser.add_option('--gpu', '--GPU', dest='gpu', type=str, default='3',
                     help='Select cuda device.')
-parser.add_option('--df', '--disp_freq', dest='disp_freq', default=50, type='int',
+parser.add_option('--df', '--disp_freq', dest='disp_freq', default=175, type='int',
                   help='frequency of train logging (default: 50)')
-parser.add_option('--vf', '--val_freq', dest='val_freq', default=400, type='int',
+parser.add_option('--vf', '--val_freq', dest='val_freq', default=720, type='int',
                   help='frequency of val evaluation (default: 2200)')
 parser.add_option('--lb', '--load_bool', dest='load', default=False,
                   help='Initialize pretrained model (default False)')
@@ -20,7 +20,7 @@ parser.add_option('--lp', '--load_model_path', dest='load_model_path',
                   help='path to load a .ckpt model')
 parser.add_option('-e', '--epochs', dest='epochs', default=100, type='int',
                   help='number of epochs (default: 500)')
-parser.add_option('-b', '--batch-size', dest='batch_size', default=4, type='int',
+parser.add_option('-b', '--batch-size', dest='batch_size', default=8, type='int',
                   help='batch size (default: 2)')
 
 # GlomSeg Settings
