@@ -71,6 +71,8 @@ def get_train_valid_loader(data_dir, dataset, batch_size, shuffle=True, num_work
         val_dataset = HuBMAPCropDataset(data_dir, mode="val")
         valid_loader = DataLoader(val_dataset, batch_size=options.batch_size,
                                 shuffle=False, num_workers=options.workers, drop_last=False)
+        height, width = val_dataset.get_global_image_size()
+        return train_loader, valid_loader, (height, width)
 
     return train_loader, valid_loader
 

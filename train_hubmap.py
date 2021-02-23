@@ -75,7 +75,7 @@ def get_dice_coeff(pred, targs):
 
     Returns: Dice coeff over a batch or over a single pair.
     """
-    pred = (pred > 0).float()
+    pred = (pred > options.threshold).float()
     return 2.0 * (pred * targs).sum() / ((pred + targs).sum() + 0.0001)
 
 

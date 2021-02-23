@@ -90,10 +90,10 @@ def train_net():
         for batch in train_loader:
             imgs = batch['image']
             true_masks = batch['mask']
-            # assert imgs.shape[1] == net.n_channels, \
-            #     f'Network has been defined with {net.n_channels} input channels, ' \
-            #     f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
-            #     'the images are loaded correctly.'
+            assert imgs.shape[1] == options.n_channels, \
+                f'Network has been defined with {options.n_channels} input channels, ' \
+                f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
+                'the images are loaded correctly.'
 
             imgs = imgs.to(device=device, dtype=torch.float32)
             mask_type = torch.float32 if options.n_classes == 1 else torch.long
@@ -129,8 +129,8 @@ def train_net():
                 #     train_logger.scalar_summary(tag, value, global_step)
                 start_time = time.time()
 
+            # Modified eval function to validate on the global mask
             if global_step % options.val_freq == 0:
-
                 log_string('--' * 30)
                 log_string('Evaluating at step #{}'.format(global_step))
 
@@ -146,24 +146,28 @@ def train_net():
                         writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step)
 
                 eval_start = time.time()
-                val_score, val_IOU = eval_net(net, val_loader, device)
+                val_score, val_IOU, global_dice_score = eval_net(net, val_loader, val_shape, device)
                 eval_end = time.time()
 
                 # check for improvement
                 loss_str, acc_str = '', ''
+                improved = False
                 if val_score <= best_loss:
                     loss_str, best_loss = '(improved)', val_score
-                if val_IOU >= best_acc:
-                    acc_str, best_acc = '(improved)', val_IOU
+                    improved = True
+                if global_dice_score >= best_acc:  # Using dice coefficient on global mask as accuracy
+                    acc_str, best_acc = '(improved)', global_dice_score
 
                 log_string('Validation time: {0:.4f}'.format(eval_end - eval_start))
-                log_string("Validation Loss: {0:.2f} {1}, Validation Avg. IOU: {2:.3f} {3}, Learning Rate: {4}"
-                           .format(val_score, loss_str, val_IOU, acc_str, optimizer.param_groups[0]['lr']))
+                log_string("Val Loss: {0:.2f} {1}, Global Dice Score: {2:.3f} {3}, "
+                           "Val Avg. IOU: {4:.3f}, lr: {5}"
+                           .format(val_score, loss_str, global_dice_score, acc_str,
+                                   val_IOU, optimizer.param_groups[0]['lr']))
 
                 scheduler.step(val_score)
                 writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
 
-                if net.n_classes > 1:
+                if options.n_classes > 1: # Changed from net.n_classes
                     writer.add_scalar('Loss/test', val_score, global_step)
                     writer.add_scalar('IOU/test', val_IOU, global_step)
                 else:
@@ -187,36 +191,37 @@ def train_net():
                     writer.add_images('masks/true', target_plot(true_masks), global_step)
                     writer.add_images('masks/pred', target_plot(torch.argmax(masks_pred, dim=1)), global_step)
 
-                # saving the checkpoint model
-                try:
-                    os.mkdir(dir_checkpoint)
-                    log_string('Created checkpoint directory')
-                except OSError:
-                    pass
-                try:
-                    os.mkdir(dir_checkpoint + '/' + dt_save + file_naming + '/')
-                    log_string('Created architecture model checkpoint directory')
-                except OSError:
-                    pass
+                # saving the checkpoint model if model improved
+                if improved:
+                    try:
+                        os.mkdir(dir_checkpoint)
+                        log_string('Created checkpoint directory')
+                    except OSError:
+                        pass
+                    try:
+                        os.mkdir(dir_checkpoint + '/' + dt_save + file_naming + '/')
+                        log_string('Created architecture model checkpoint directory')
+                    except OSError:
+                        pass
 
-                # info = {'loss': val_score,
-                #         'accuracy': val_IOU}
-                # for tag, value in info.items():
-                #     test_logger.scalar_summary(tag, value, global_step)
+                    # info = {'loss': val_score,
+                    #         'accuracy': val_IOU}
+                    # for tag, value in info.items():
+                    #     test_logger.scalar_summary(tag, value, global_step)
 
-                state_dict = net.state_dict()
-                for key in state_dict.keys():
-                    state_dict[key] = state_dict[key].cpu()
-                save_path = dir_checkpoint + '/' + dt_save + file_naming + '/'
-                save_path = os.path.join(save_path, '{}.ckpt'.format(global_step))
-                torch.save({
-                    'global_step': global_step,
-                    'loss': val_score,
-                    'acc': val_IOU,
-                    'save_dir': dir_checkpoint,
-                    'state_dict': state_dict},
-                    save_path)
-                log_string('Model saved at: {}'.format(save_path))
+                    state_dict = net.state_dict()
+                    for key in state_dict.keys():
+                        state_dict[key] = state_dict[key].cpu()
+                    save_path = dir_checkpoint + '/' + dt_save + file_naming + '/'
+                    save_path = os.path.join(save_path, '{}.ckpt'.format(global_step))
+                    torch.save({
+                        'global_step': global_step,
+                        'loss': val_score,
+                        'acc': val_IOU,
+                        'save_dir': dir_checkpoint,
+                        'state_dict': state_dict},
+                        save_path)
+                    log_string('Model saved at: {}'.format(save_path))
                 log_string('--' * 30)
                 start_time = time.time()
 
@@ -307,8 +312,9 @@ if __name__ == '__main__':
     ##################################
     # Load dataset
     ##################################
-    train_loader, val_loader = get_train_valid_loader(options.data_dir, options.data_name, options.batch_size,
-                                                      shuffle=True, num_workers=options.workers, pin_memory=True)
+    train_loader, val_loader, val_shape = get_train_valid_loader(options.data_dir, options.data_name,
+                                                                 options.batch_size, shuffle=True,
+                                                                 num_workers=options.workers, pin_memory=True)
 
     ##################################
     # TRAINING/TESTING

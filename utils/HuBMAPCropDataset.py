@@ -11,6 +11,17 @@ from torchvision import transforms
 from PIL import Image
 
 
+def rle_to_mask(_encoding, size):
+    # encoding is a string. convert it to int.
+    mask = np.zeros(size[0] * size[1], dtype=np.uint8)
+    encoding_np = np.fromstring(_encoding, dtype=int, sep=' ')
+    starts = np.array(encoding_np)[::2]
+    lengths = np.array(encoding_np)[1::2]
+    for start, length in zip(starts, lengths):
+        mask[start:start + length] = 1
+    return mask.reshape(size, order='F')
+
+
 class HuBMAPCropDataset(Dataset):
     def __init__(self, base_dir, mode, patient=None):
         self.base_dir = base_dir
@@ -41,18 +52,26 @@ class HuBMAPCropDataset(Dataset):
         elif mode == "val":
             # Open tiff of validation tiff file
             train_pats = pd.read_csv("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_2021_HuBMAP/trainData/train.csv")
-            valid_tiff_name = train_pats.iloc[options.test_tiff_value]['id']
-            tiff_file = tiff.imread("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_221_HuBMAP/trainData/" +
-                                    valid_tiff_name + '.tiff')
+            self.valid_tiff_name = train_pats.iloc[options.test_tiff_value]['id']
+            tiff_file = tiff.imread("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_2021_HuBMAP/trainData/" +
+                                    self.valid_tiff_name + '.tiff')
+
             if len(tiff_file.shape) > 3:
                 tiff_file = tiff_file.squeeze(0).squeeze(0)
                 tiff_file = np.moveaxis(tiff_file, 0, -1)
+
             grid = self.make_grid((tiff_file.shape[0], tiff_file.shape[1]), window=options.test_window)
             if len(self.slice_indexes) > 0:
                 self.slice_indexes = np.concatenate((self.slice_indexes, grid), axis=0)
             else:
                 self.slice_indexes = grid
             self.global_img = tiff_file
+            self.val_tiff_shape = tiff_file.shape  # tuple (height, width, channels)
+
+            # Load global mask for validation image
+            encoding = train_pats.loc[train_pats["id"] == self.valid_tiff_name]['encoding'].iloc[0]
+            self.global_mask = rle_to_mask(encoding, (self.val_tiff_shape[0], self.val_tiff_shape[1]))
+
         elif mode == "test":
             tiff_file = tiff.imread("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_221_HuBMAP/testData/"
                                     + patient + '.tiff')
@@ -108,7 +127,7 @@ class HuBMAPCropDataset(Dataset):
             img = np.moveaxis(img, -1, 0)
             mask = np.array(mask)
 
-            return {'image': torch.from_numpy(img), 'mask': torch.from_numpy(mask)}
+            return {'image': torch.from_numpy(img), 'mask': torch.from_numpy(mask).unsqueeze(0)}
 
             # img = transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=.05, saturation=.05).forward(img)
             # img = transforms.GaussianBlur(kernel_size=(3,3)).forward(img)
@@ -129,10 +148,13 @@ class HuBMAPCropDataset(Dataset):
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
             img = self.global_img[y1:y2, x1:x2, :]
-            coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
-            img = transforms.ToTensor()(img)
+            mask = self.global_mask[y1:y2, x1:x2]
 
-            return img, mask, coordinate
+            img = transforms.ToTensor()(img)
+            mask = transforms.ToTensor()(mask) * 255
+            coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
+
+            return {'image': img, 'global_mask': mask, 'coords': coordinate}
 
         elif self.mode == "test":
             coordinate = self.slice_indexes[index]
@@ -143,7 +165,15 @@ class HuBMAPCropDataset(Dataset):
             return img, coordinate
 
     def __len__(self):
-        if self.mode == "train" or self.mode == 'val':
+        if self.mode == "train":
             return len(self.images)
-        elif self.mode == "test":
+        elif self.mode == "test" or self.mode == 'val':
             return len(self.slice_indexes)
+
+"""
+import matplotlib.pyplot as plt
+import numpy as np
+
+plt.imshow(np.moveaxis(pred_mask[0], 0, -1))
+plt.show()
+"""

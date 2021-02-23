@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import numpy as np
-from config import *
-from train import global_shift_mask, rle_encode_less_memory
-from HuBMAPCropDataset import HuBMAPCropDataset
+from hubmap_config import *
+from train_hubmap import global_shift_mask, rle_encode_less_memory
+from utils.HuBMAPCropDataset import HuBMAPCropDataset
 from torch.utils.data import DataLoader
 from PIL import Image
 import pandas as pd
@@ -39,6 +39,7 @@ def predict():
                 pred_mask_batch = model(img_batch)
 
                 # Converts mask to 0/1.
+                pred_mask_batch = torch.sigmoid(pred_mask_batch)
                 pred_mask_batch = (pred_mask_batch > options.threshold).type(torch.int8)
                 pred_mask_batch = pred_mask_batch * 255
 
