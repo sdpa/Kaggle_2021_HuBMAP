@@ -3,6 +3,7 @@ import torch
 import math
 import random
 from PIL import Image, ImageOps
+from skimage.transform import rotate
 import numpy as np
 import numbers
 import types
@@ -122,6 +123,25 @@ class JointRandomHorizontalFlip(object):
         if random.random() < 0.5:
             return [img.transpose(Image.FLIP_LEFT_RIGHT) for img in imgs]
         return imgs
+
+
+class JointRandomVerticalFlip(object):
+    """Randomly vertically flips the given list of PIL.Image with a probability of 0.5
+    """
+
+    def __call__(self, imgs):
+        if random.random() < 0.5:
+            return [img.transpose(Image.FLIP_TOP_BOTTOM) for img in imgs]
+        return imgs
+
+
+class JointRandomRotation(object):
+    """Randomly horizontally flips the given list of PIL.Image with a probability of 0.5
+    """
+
+    def __call__(self, imgs):
+        rot_degrees = random.randint(0, 360)
+        return [Image.fromarray((rotate(np.array(img), rot_degrees) * 255).astype(np.uint8)) for img in imgs]
 
 
 class JointRandomSizedCrop(object):

@@ -7,7 +7,7 @@ from . import joint_transforms
 import os
 import torch
 from torchvision import transforms
-# import cv2
+import random
 from PIL import Image
 
 
@@ -32,7 +32,9 @@ class HuBMAPCropDataset(Dataset):
         self.global_img = None
         self.train_transform = transforms.Compose([
             joint_transforms.JointRandomCrop(options.train_window),
-            joint_transforms.JointRandomHorizontalFlip()
+            joint_transforms.JointRandomHorizontalFlip(),
+            joint_transforms.JointRandomVerticalFlip(),
+            joint_transforms.JointRandomRotation()
         ])
 
         if mode == "train":
@@ -73,7 +75,7 @@ class HuBMAPCropDataset(Dataset):
             self.global_mask = rle_to_mask(encoding, (self.val_tiff_shape[0], self.val_tiff_shape[1]))
 
         elif mode == "test":
-            tiff_file = tiff.imread("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_221_HuBMAP/testData/"
+            tiff_file = tiff.imread("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_2021_HuBMAP/testData/"
                                     + patient + '.tiff')
             if len(tiff_file.shape) > 3:
                 tiff_file = tiff_file.squeeze(0).squeeze(0)
@@ -113,36 +115,24 @@ class HuBMAPCropDataset(Dataset):
             mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
 
             # Augmentations (and need to crop 1024x1024 to 512x512
-            aug_arr = self.train_transform([img, mask])
+            if random.random() < 0.5:  # Probabilities are from training notebook of Kidney Inference (Score 0.865)
+                img = transforms.ColorJitter(brightness=0.2, contrast=0.2, hue=.05, saturation=.05).forward(img)
+            if random.random() < 0.1:
+                img = transforms.GaussianBlur(kernel_size=(3, 3)).forward(img)
+
+            aug_arr = self.train_transform([img, mask])  # RandomCrop, horiz and vertical flip, random rotation
             img, mask = aug_arr[0], aug_arr[1]
 
             # Image normalization
             img = np.array(img)
             if img.max() != img.min():
                 img = (img - img.min()) / (img.max() - img.min())
-            # img = Image.fromarray((img * 255).astype('uint8'))
 
             # img = np.array(img)
             img = np.moveaxis(img, -1, 0)
             mask = np.array(mask)
 
             return {'image': torch.Tensor(img), 'mask': torch.Tensor(mask).unsqueeze(0)}
-
-            # img = transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=.05, saturation=.05).forward(img)
-            # img = transforms.GaussianBlur(kernel_size=(3,3)).forward(img)
-            # img = transforms.ToTensor()(img)
-            # mask = transforms.ToTensor()(mask)
-            # merged = torch.cat((img, mask), 0)
-            # crop = transforms.RandomCrop((options.train_window, options.train_window),
-            #                              pad_if_needed=True).forward(merged)
-            # crop = transforms.RandomHorizontalFlip().forward(crop)
-            # crop = transforms.RandomVerticalFlip().forward(crop)
-            # crop = transforms.RandomRotation(90).forward(crop)
-            # # # Split them back.
-            # img = crop[:3, :, :]
-            # mask = crop[-1:, :, :]
-            # mask = mask * 255
-            # return img, mask
         elif self.mode == "val":
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
@@ -155,14 +145,18 @@ class HuBMAPCropDataset(Dataset):
             coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
 
             return {'image': img, 'mask': mask, 'coords': coordinate}
-
         elif self.mode == "test":
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
             img = self.global_img[y1:y2,x1:x2,:]
             coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
             img = transforms.ToTensor()(img)
-            return img, coordinate
+
+            # TTA (Test Time Augmentations) for Kaggle predictions
+            img_horiz = transforms.RandomHorizontalFlip(p=1)(img)
+            img_vert = transforms.RandomVerticalFlip(p=1)(img)
+
+            return img, coordinate, img_horiz, img_vert
 
     def __len__(self):
         if self.mode == "train":

@@ -35,7 +35,7 @@ def compute_iou(masks1, masks2):
 def eval_net(net, loader, val_shape, device):
     """Evaluation without the densecrf with the dice coefficient"""
     net.eval()
-    mask_type = torch.float32 if options.n_classes == 1 else torch.long
+    mask_type = torch.float32 if net.n_classes == 1 else torch.long
     n_val = len(loader)  # the number of batch
     tot = 0
     tIOU = 0
@@ -59,7 +59,7 @@ def eval_net(net, loader, val_shape, device):
             else:
                 mask_pred = net(imgs)
 
-            if options.n_classes > 1:  # Changed from net.n_classes
+            if net.n_classes > 1:
                 tot += F.cross_entropy(mask_pred, true_masks).item()
                 sol = torch.argmax(mask_pred, dim=1)
                 if options.data_name == 'CamVid':
@@ -91,12 +91,13 @@ def eval_net(net, loader, val_shape, device):
                 tot += dice_coeff(pred, true_masks).item()
                 # pbar.update()
 
-                # Assembling global mask
-                for mask, coordinate in zip(pred, coords):
-                    mask = torch.squeeze(mask)
-                    # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
-                    x1, x2, y1, y2 = coordinate
-                    pred_global_mask[int(y1):int(y2), int(x1):int(x2)] = mask
+                if options.kaggle_eval:
+                    # Assembling global mask
+                    for mask, coordinate in zip(pred, coords):
+                        mask = torch.squeeze(mask)
+                        # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
+                        x1, x2, y1, y2 = coordinate
+                        pred_global_mask[int(y1):int(y2), int(x1):int(x2)] = mask
     # pred_global_mask = pred_global_mask.numpy()
 
     # Load global mask for validation image

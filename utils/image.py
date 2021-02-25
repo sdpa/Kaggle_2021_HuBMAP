@@ -1,4 +1,5 @@
 import numpy as np
+import numpy
 from scipy.ndimage import zoom
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.interpolation import map_coordinates, rotate

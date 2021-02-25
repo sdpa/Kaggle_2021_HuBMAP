@@ -89,7 +89,7 @@ def train_net():
 
         for i, batch in enumerate(train_loader):
             # print('Batch', i)
-            imgs = batch['image']
+            imgs = batch['image']  # Debug session: Imgs and corresponding masks look good
             true_masks = batch['mask']
             # assert imgs.shape[1] == options.n_channels, \
             #     f'Network has been defined with {options.n_channels} input channels, ' \
@@ -97,7 +97,7 @@ def train_net():
             #     'the images are loaded correctly.'
 
             imgs = imgs.to(device=device, dtype=torch.float32)
-            mask_type = torch.float32 if options.n_classes == 1 else torch.long
+            mask_type = torch.float32 if net.n_classes == 1 else torch.long
             true_masks = true_masks.to(device=device, dtype=mask_type)
 
             if (options.arch == 'HRNetM') or (options.arch == 'DeepLabv3+x71') or (options.arch == 'PanDeepLabx71'):
@@ -155,20 +155,25 @@ def train_net():
                 improved = False
                 if val_score <= best_loss:
                     loss_str, best_loss = '(improved)', val_score
-                if global_dice_score >= best_acc:  # Using dice coefficient on global mask as accuracy
-                    acc_str, best_acc = '(improved)', global_dice_score
+                if options.kaggle_eval and global_dice_score >= best_acc:
+                    acc_str, best_acc = '(improved)', global_dice_score  # Using dice score on global mask as accuracy
+                    improved = True
+                elif not options.kaggle_eval and val_IOU >= best_acc:
+                    acc_str, best_acc = '(improved)', val_IOU
                     improved = True
 
                 log_string('Validation time: {0:.4f}'.format(eval_end - eval_start))
-                log_string("Val Loss: {0:.2f} {1}, Global Dice Score: {2:.3f} {3}, "
-                           "Val Avg. IOU: {4:.3f}, lr: {5}"
-                           .format(val_score, loss_str, global_dice_score, acc_str,
-                                   val_IOU, optimizer.param_groups[0]['lr']))
+                if options.kaggle_eval:
+                    log_string("Val Loss: {0:.2f} {1}, Global Dice Score: {2:.3f} {3}, lr: {4}"
+                               .format(val_score, loss_str, global_dice_score, acc_str, optimizer.param_groups[0]['lr']))
+                else:
+                    log_string("Val Loss: {0:.2f} {1}, Val Avg. IOU: {2:.3f} {3}, Val Avg. IOU: {4:.3f}, lr: {4}"
+                               .format(val_score, loss_str, val_IOU, acc_str, optimizer.param_groups[0]['lr']))
 
                 scheduler.step(val_score)
                 writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
 
-                if options.n_classes > 1: # Changed from net.n_classes
+                if net.n_classes > 1:
                     writer.add_scalar('Loss/test', val_score, global_step)
                     writer.add_scalar('IOU/test', val_IOU, global_step)
                 else:
@@ -180,7 +185,7 @@ def train_net():
                     im = imgs
                 writer.add_images('images', im, global_step)
 
-                if options.n_classes == 1:  # Changed from net.n_classes
+                if net.n_classes == 1:
                     writer.add_images('masks/true', true_masks, global_step)
                     writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
                 elif options.data_name == 'CamVid':
@@ -252,6 +257,10 @@ if __name__ == '__main__':
     save_log = logs_dir + file_naming + '/'
     LOG_FOUT = open(os.path.join(save_log, 'log_train.txt'), 'w')
 
+    # Backup train and dataloader files
+    os.system('cp {}/train.py {}train.py'.format(BASE_DIR, save_log))
+    os.system('cp {}/utils/HuBMAPCropDataset.py {}HuBMAPCropDataset.py'.format(BASE_DIR, save_log))
+
     ##################################
     # Initialize the model
     ##################################
@@ -287,6 +296,10 @@ if __name__ == '__main__':
         net = HRNet_Mscale(n_classes=options.n_classes, criterion=criterion, args=options)
     elif options.arch == 'efficientnet-b2':
         net = get_efficientunet_b2(out_channels=options.n_classes, pretrained=False)
+        net.n_classes = options.n_classes
+    elif options.arch == 'efficientnet-b4':
+        net = get_efficientunet_b4(out_channels=options.n_classes, pretrained=False)
+        net.n_classes = options.n_classes
 
     log_string('Model Generated.')
     log_string("Number of parameters: {}".format(sum(param.numel() for param in net.parameters())))
@@ -308,7 +321,7 @@ if __name__ == '__main__':
                                weight_decay=options.weight_decay, amsgrad=False)
     else:
         optimizer = optim.SGD(net.parameters(), lr=options.lr, momentum=options.beta1, weight_decay=options.weight_decay)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if options.n_classes > 1 else 'max', patience=100)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=100)
 
     ##################################
     # Load dataset
@@ -344,3 +357,14 @@ if __name__ == '__main__':
             sys.exit(0)
         except SystemExit:
             os._exit(0)
+
+"""
+import matplotlib.pyplot as plt
+import numpy as np
+
+for i in range(4):
+    plt.imshow(np.moveaxis(imgs[i].detach().numpy(), 0, -1))
+    plt.show()
+    plt.imshow(true_masks[i].detach().squeeze(0).numpy())
+    plt.show()
+"""

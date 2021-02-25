@@ -3,24 +3,24 @@ from optparse import OptionParser
 parser = OptionParser()
 
 # General settings
-parser.add_option('--ar', '--arch', dest='arch', type=str, default='efficientnet-b2',
+parser.add_option('--ar', '--arch', dest='arch', type=str, default='efficientnet-b4',
                     help='The desired segmentation architecture. Input either '
                          'UNet, Tiramisu57/67/103, SegCaps, WCaps, DeepLabv3+x71,'
                          'PanDeepLabx71, or HRNetM')
-parser.add_option('--gpu', '--GPU', dest='gpu', type=str, default='3',
+parser.add_option('--gpu', '--GPU', dest='gpu', type=str, default='0',
                     help='Select cuda device.')
-parser.add_option('--df', '--disp_freq', dest='disp_freq', default=175, type='int',
+parser.add_option('--df', '--disp_freq', dest='disp_freq', default=45, type='int',
                   help='frequency of train logging (default: 50)')
-parser.add_option('--vf', '--val_freq', dest='val_freq', default=720, type='int',
+parser.add_option('--vf', '--val_freq', dest='val_freq', default=90, type='int',
                   help='frequency of val evaluation (default: 2200)')
 parser.add_option('--lb', '--load_bool', dest='load', default=False,
                   help='Initialize pretrained model (default False)')
 parser.add_option('--lp', '--load_model_path', dest='load_model_path',
-                  default='./save/20200817_100904_TR_resnet_smallnorb/models/2627.ckpt',
+                  default='./checkpoints/2021_02_24_212820_KaggleCrops_efficientnet-b2_Adam_LR0.0003_BS16/18990.ckpt',
                   help='path to load a .ckpt model')
-parser.add_option('-e', '--epochs', dest='epochs', default=100, type='int',
+parser.add_option('-e', '--epochs', dest='epochs', default=200, type='int',
                   help='number of epochs (default: 500)')
-parser.add_option('-b', '--batch-size', dest='batch_size', default=8, type='int',
+parser.add_option('-b', '--batch-size', dest='batch_size', default=16, type='int',
                   help='batch size (default: 2)')
 
 # GlomSeg Settings
@@ -98,7 +98,7 @@ parser.add_option('--is', '--is', dest='cs_imsize', default=(256, 512),
                   help='Set default image size')
 
 # For optimizer/scheduler
-parser.add_option('--lr', '--lr', dest='lr', default=0.001, type='float',
+parser.add_option('--lr', '--lr', dest='lr', default=0.0003, type='float',
                   help='learning rate (default: 0.001)')
 parser.add_option('--wd', '--weight_decay', dest='weight_decay', default=5e-4, type='float',
                   help='weight decay (default: 5e-4)')
@@ -122,6 +122,8 @@ parser.add_option('--SE', '--SE', dest='SE', default=False,
 # For Kaggle
 parser.add_option('--loo', '--leave-one-out', dest='test_tiff_value', default=1,  # smallest tiff
                   help='Tiff file to remove from train and add to validation set for Kaggle dataset')
+parser.add_option('--ke', '--kaggle-eval', dest='kaggle_eval', default=True,
+                  help='Use Kaggle evaluation on global dice image')
 parser.add_option('--tw', '--train-window', dest='train_window', default=512,
                   help='Train on images on this size')
 parser.add_option('--vw', '--val-window', dest='val_window', default=512,
@@ -129,11 +131,11 @@ parser.add_option('--vw', '--val-window', dest='val_window', default=512,
 parser.add_option('--tt', '--test-window', dest='test_window', default=512,
                   help='Test on images on this size')
 
-parser.add_option('--th', '--threshold', dest='threshold', default=0.39,
-                  help='Threshold of mask to convert values to 0/1 in the mask')
-parser.add_option('--y', '--y-shift', dest='y_shift', default=-40, type='int',
+parser.add_option('--th', '--threshold', dest='threshold', default=0.35,
+                  help='Threshold of mask to convert values to 0/1 in the mask')  # Notebook used 0.39
+parser.add_option('--y', '--y-shift', dest='y_shift', default=-42, type='int',
                   help='Amount to shift global mask in y-direction')
-parser.add_option('--x', '--x-shift', dest='x_shift', default=-24, type='int',
+parser.add_option('--x', '--x-shift', dest='x_shift', default=-20, type='int',
                   help='Amount to shift global mask in x-direction')
 
 # For save and loading
