@@ -39,24 +39,18 @@ class HuBMAPCropDataset(Dataset):
 
         if mode == "train":
             # Get all training patients.
-            train_pats = pd.read_csv("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_2021_HuBMAP/trainData/train.csv")
+            train_pats = pd.read_csv(options.kaggle_data_path + "/tiffs/trainData/train.csv")
             leave_out_name = train_pats.iloc[options.test_tiff_value]['id']
-            images = os.listdir(self.base_dir + "/ImgCrops")
-            masks = os.listdir(self.base_dir + "/maskCrops")
-            if mode == "train":
-                self.images = [x for x in images if leave_out_name not in x]
-                self.masks = [x for x in masks if leave_out_name not in x]
-                del images, masks
-            elif mode == "val":
-                self.images = [x for x in images if leave_out_name in x]
-                self.masks = [x for x in masks if leave_out_name in x]
-                del images, masks
+            images = os.listdir(options.kaggle_data_path + "/improved_crops/ImgCrops")
+            masks = os.listdir(options.kaggle_data_path + "/improved_crops/maskCrops")
+            self.images = [x for x in images if leave_out_name not in x]
+            self.masks = [x for x in masks if leave_out_name not in x]
+            del images, masks
         elif mode == "val":
             # Open tiff of validation tiff file
-            train_pats = pd.read_csv("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_2021_HuBMAP/trainData/train.csv")
+            train_pats = pd.read_csv(options.kaggle_data_path + "/tiffs/trainData/train.csv")
             self.valid_tiff_name = train_pats.iloc[options.test_tiff_value]['id']
-            tiff_file = tiff.imread("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_2021_HuBMAP/trainData/" +
-                                    self.valid_tiff_name + '.tiff')
+            tiff_file = tiff.imread(options.kaggle_data_path + "/tiffs/trainData/" + self.valid_tiff_name + '.tiff')
 
             if len(tiff_file.shape) > 3:
                 tiff_file = tiff_file.squeeze(0).squeeze(0)
@@ -111,14 +105,14 @@ class HuBMAPCropDataset(Dataset):
     def __getitem__(self, index):
         if self.mode == "train":
             file_name = self.images[index]
-            img = Image.open(self.base_dir + "/ImgCrops/" + file_name)
-            mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
+            img = Image.open(options.kaggle_data_path + "/improved_crops/ImgCrops/" + file_name)
+            mask = Image.open(options.kaggle_data_path + "/improved_crops/maskCrops/" + file_name)
 
-            # Augmentations (and need to crop 1024x1024 to 512x512
+            # Augmentations (and need to crop 1024x1024 to 512x512)
             if random.random() < 0.5:  # Probabilities are from training notebook of Kidney Inference (Score 0.865)
-                img = transforms.ColorJitter(brightness=0.2, contrast=0.2, hue=.05, saturation=.05).forward(img)
+                img = transforms.ColorJitter(brightness=0.2, contrast=0.2, hue=.05, saturation=.05)(img)
             if random.random() < 0.1:
-                img = transforms.GaussianBlur(kernel_size=(3, 3)).forward(img)
+                img = transforms.GaussianBlur(kernel_size=(3, 3))(img)
 
             aug_arr = self.train_transform([img, mask])  # RandomCrop, horiz and vertical flip, random rotation
             img, mask = aug_arr[0], aug_arr[1]
@@ -133,6 +127,7 @@ class HuBMAPCropDataset(Dataset):
             mask = np.array(mask)
 
             return {'image': torch.Tensor(img), 'mask': torch.Tensor(mask).unsqueeze(0)}
+
         elif self.mode == "val":
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
@@ -145,10 +140,11 @@ class HuBMAPCropDataset(Dataset):
             coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
 
             return {'image': img, 'mask': mask, 'coords': coordinate}
+
         elif self.mode == "test":
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
-            img = self.global_img[y1:y2,x1:x2,:]
+            img = self.global_img[y1:y2, x1:x2, :]
             coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
             img = transforms.ToTensor()(img)
 
@@ -163,6 +159,7 @@ class HuBMAPCropDataset(Dataset):
             return len(self.images)
         elif self.mode == "test" or self.mode == 'val':
             return len(self.slice_indexes)
+
 
 """
 import matplotlib.pyplot as plt

@@ -1,32 +1,30 @@
 import pandas as pd
 import json
 import numpy as np
-import os
+# import os
 import sys
 import tifffile as tiff
 import matplotlib.pyplot as plt
 from PIL import Image
 import random
-import cv2
-import math
 from shapely.geometry import Polygon
-from utils import rle_to_mask
+from utils.rle_to_mask import rle_to_mask
+from utils.config import options
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-train_patients = pd.read_csv(BASE_DIR + "/trainData/train.csv")
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+train_patients = pd.read_csv(options.kaggle_data_path + "/tiffs/trainData/train.csv")
 train_patient_names = train_patients['id']
-metadata_all = pd.read_csv(BASE_DIR + "/trainData/HuBMAP-20-dataset_information.csv")
+metadata_all = pd.read_csv(options.kaggle_data_path + "/tiffs/HuBMAP-20-dataset_information.csv")
 
 medulla_percent = 0.45
 cortex_no_glom_percent = 0.45
-background_percent  = 0.10
+background_percent = 0.10
 
 largest = [0, 0]
 for i, name in enumerate(train_patient_names):
     print(name)
-    img = tiff.imread(BASE_DIR + "/trainData/" + name + ".tiff")
-    # img = cv2.imread(BASE_DIR + "/trainData/" + name + ".tiff")
-    patient_meta =  metadata_all[metadata_all['image_file'] == name + '.tiff']
+    img = tiff.imread(options.kaggle_data_path + "/tiffs/trainData/" + name + ".tiff")
+    patient_meta = metadata_all[metadata_all['image_file'] == name + '.tiff']
     rows = patient_meta['height_pixels'].iloc[0]
     cols = patient_meta['width_pixels'].iloc[0]
     print(rows, cols)
@@ -41,12 +39,10 @@ for i, name in enumerate(train_patient_names):
     global_mask = rle_to_mask(encoding, (rows, cols))
 
     print("Mask shape: ", global_mask.shape)
-    glom_data = None
-    anatomical_data = None
-    with open(BASE_DIR + '/trainData/' + name + '.json') as f1, open(BASE_DIR + '/trainData/' + name + '-anatomical-structure'+ '.json') as f2:
+    with open(options.kaggle_data_path + '/tiffs/trainData/' + name + '.json') as \
+            f1, open(options.kaggle_data_path + '/tiffs/trainData/' + name + '-anatomical-structure.json') as f2:
         glom_data = json.load(f1)
         anatomical_data = json.load(f2)
-
 
     max_glom_count = len(glom_data)
     max_medulla = round(medulla_percent * max_glom_count)
@@ -62,8 +58,8 @@ for i, name in enumerate(train_patient_names):
     # create crops of gloms.
     while glom_created < max_glom_count:
         polygon = glom_data[glom_created]['geometry']['coordinates'][0]
-        x1,y1 = sys.maxsize, sys.maxsize
-        x2,y2 = 0,0
+        x1, y1 = sys.maxsize, sys.maxsize
+        x2, y2 = 0, 0
         for point in polygon:
             x = point[0]
             y = point[1]
@@ -107,10 +103,10 @@ for i, name in enumerate(train_patient_names):
         save_name = name + '_glom_' + str(new_y1) + '_' + str(new_x1)
         img_crop = img[new_y1:new_y2, new_x1:new_x2, :]
         im = Image.fromarray(img_crop)
-        im.save(BASE_DIR + "/trainData/ImgCrops/{}.png".format(save_name))
+        im.save(options.kaggle_data_path + "/improved_crops/ImgCrops/{}.png".format(save_name))
 
         im = Image.fromarray(mask_crop)
-        im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
+        im.save(options.kaggle_data_path + "/improved_crops/maskCrops/{}.png".format(save_name))
 
         # offset to plot on matplotlib
         new_y1 = rows - new_y1
@@ -123,7 +119,7 @@ for i, name in enumerate(train_patient_names):
 
     # create crops from cortex, medulla and background.
     # There is medulla,cortex or cortex, medulla
-    cortex_polygon, cortex_polygon_2, medulla_polygon, = [],[],[]
+    cortex_polygon, cortex_polygon_2, medulla_polygon, = [], [], []
 
     # Get only cortex and background
     if len(anatomical_data) == 1:
@@ -153,13 +149,13 @@ for i, name in enumerate(train_patient_names):
     for point in cortex_polygon_2:
         point[1] = rows - point[1]
 
-    #create shapely shapes for cortex, medulla and image.
+    # create shapely shapes for cortex, medulla and image.
     cortex_sh = Polygon(cortex_polygon)
     medulla_sh = Polygon(medulla_polygon)
-    img_sh = Polygon([[0,0],
-                      [cols,0],
-                      [cols,rows],
-                      [0,rows]])
+    img_sh = Polygon([[0, 0],
+                      [cols, 0],
+                      [cols, rows],
+                      [0, rows]])
     cortex_2_sh = None
     if len(cortex_polygon_2) != 0:
         cortex_2_sh = Polygon(cortex_polygon_2)
@@ -171,7 +167,8 @@ for i, name in enumerate(train_patient_names):
         ax.plot(*medulla_sh.exterior.xy, color="orange")
     ax.plot(*cortex_sh.exterior.xy, color="green")
 
-    while cortex_no_glom_created < max_cortex_no_glom or background_created < max_background or medulla_created < max_medulla:
+    while cortex_no_glom_created < max_cortex_no_glom or background_created < max_background \
+            or medulla_created < max_medulla:
         x, y = random.randint(0, cols-1024), random.randint(0, rows-1024)
         corners = [[x, y], [x + 1024, y], [x + 1024, y + 1024], [x, y + 1024]]
         box = Polygon(corners)
@@ -193,10 +190,10 @@ for i, name in enumerate(train_patient_names):
                 save_name = name + '_noglom_' + str(y1) + '_' + str(x1)
                 img_crop = img[y1:y2, x1:x2, :]
                 im = Image.fromarray(img_crop)
-                im.save(BASE_DIR + "/trainData/ImgCrops/{}.png".format(save_name))
+                im.save(options.kaggle_data_path + "/improved_crops/ImgCrops/{}.png".format(save_name))
 
                 im = Image.fromarray(mask_crop)
-                im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
+                im.save(options.kaggle_data_path + "/improved_crops/maskCrops/{}.png".format(save_name))
 
         if medulla_sh.contains(box) and medulla_created < max_medulla:
             medulla_created += 1
@@ -208,10 +205,11 @@ for i, name in enumerate(train_patient_names):
             save_name = name + '_medulla_' + str(y1) + '_' + str(x1)
             img_crop = img[y1:y2, x1:x2, :]
             im = Image.fromarray(img_crop)
-            im.save(BASE_DIR + "/trainData/ImgCrops/{}.png".format(save_name))
+            im.save(options.kaggle_data_path + "/improved_crops/ImgCrops/{}.png".format(save_name))
             im = Image.fromarray(mask_crop)
-            im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
-        if not cortex_sh.contains(box) and img_sh.contains(box) and not medulla_sh.contains(box) and background_created < max_background:
+            im.save(options.kaggle_data_path + "/improved_crops/maskCrops/{}.png".format(save_name))
+        if not cortex_sh.contains(box) and img_sh.contains(box) and not medulla_sh.contains(box) \
+                and background_created < max_background:
             background_created += 1
             ax.plot(*box.exterior.xy, color='blue')
             x1, y1 = corners[1][0], corners[1][1]
@@ -221,9 +219,9 @@ for i, name in enumerate(train_patient_names):
             save_name = name + '_bg_' + str(y1) + '_' + str(x1)
             img_crop = img[y1:y2, x1:x2, :]
             im = Image.fromarray(img_crop)
-            im.save(BASE_DIR + "/trainData/ImgCrops/{}.png".format(save_name))
+            im.save(options.kaggle_data_path + "/improved_crops/ImgCrops/{}.png".format(save_name))
             im = Image.fromarray(mask_crop)
-            im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
+            im.save(options.kaggle_data_path + "/improved_crops/maskCrops/{}.png".format(save_name))
     plt.axis('equal')
     plt.title(name)
     plt.show()

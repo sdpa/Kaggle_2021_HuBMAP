@@ -3,11 +3,11 @@ from optparse import OptionParser
 parser = OptionParser()
 
 # General settings
-parser.add_option('--ar', '--arch', dest='arch', type=str, default='efficientnet-b4',
+parser.add_option('--ar', '--arch', dest='arch', type=str, default='efficientnet-b3',
                     help='The desired segmentation architecture. Input either '
                          'UNet, Tiramisu57/67/103, SegCaps, WCaps, DeepLabv3+x71,'
                          'PanDeepLabx71, or HRNetM')
-parser.add_option('--gpu', '--GPU', dest='gpu', type=str, default='0',
+parser.add_option('--gpu', '--GPU', dest='gpu', type=str, default='3',
                     help='Select cuda device.')
 parser.add_option('--df', '--disp_freq', dest='disp_freq', default=45, type='int',
                   help='frequency of train logging (default: 50)')
@@ -20,7 +20,7 @@ parser.add_option('--lp', '--load_model_path', dest='load_model_path',
                   help='path to load a .ckpt model')
 parser.add_option('-e', '--epochs', dest='epochs', default=200, type='int',
                   help='number of epochs (default: 500)')
-parser.add_option('-b', '--batch-size', dest='batch_size', default=16, type='int',
+parser.add_option('-b', '--batch-size', dest='batch_size', default=4, type='int',
                   help='batch size (default: 2)')
 
 # GlomSeg Settings
@@ -120,6 +120,9 @@ parser.add_option('--SE', '--SE', dest='SE', default=False,
                   help='Whether to test Capsule Squeeze Excitation (default = False)')
 
 # For Kaggle
+parser.add_option('--kaggle-data-path', dest='kaggle_data_path',
+                  default='/home/cougarnet.uh.edu/srizvi7/Desktop/data/public/Kaggle_HuBMAP',
+                  help='Path to base directory of Kaggle datasets')
 parser.add_option('--loo', '--leave-one-out', dest='test_tiff_value', default=1,  # smallest tiff
                   help='Tiff file to remove from train and add to validation set for Kaggle dataset')
 parser.add_option('--ke', '--kaggle-eval', dest='kaggle_eval', default=True,

@@ -101,7 +101,7 @@ def eval_net(net, loader, val_shape, device):
     # pred_global_mask = pred_global_mask.numpy()
 
     # Load global mask for validation image
-    train_pats = pd.read_csv("/home/cougarnet.uh.edu/srizvi7/Desktop/Kaggle_2021_HuBMAP/trainData/train.csv")
+    train_pats = pd.read_csv(options.kaggle_data_path + "/tiffs/trainData/train.csv")
     valid_tiff_name = train_pats.iloc[options.test_tiff_value]['id']
     encoding = train_pats.loc[train_pats["id"] == valid_tiff_name]['encoding'].iloc[0]
     true_global_mask = rle_to_mask(encoding, val_shape)

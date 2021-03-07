@@ -276,7 +276,8 @@ if __name__ == '__main__':
     else:
         criterion = nn.BCEWithLogitsLoss()
 
-    if options.arch =='UNet':
+    net = None
+    if options.arch == 'UNet':
         net = UNet(n_channels=options.n_channels, n_classes=options.n_classes, bilinear=False)
     elif options.arch == 'SegCaps':
         net = SegCaps(n_channels=options.n_channels, n_classes=options.n_classes, bilinear=False)
@@ -297,8 +298,8 @@ if __name__ == '__main__':
     elif options.arch == 'efficientnet-b2':
         net = get_efficientunet_b2(out_channels=options.n_classes, pretrained=False)
         net.n_classes = options.n_classes
-    elif options.arch == 'efficientnet-b4':
-        net = get_efficientunet_b4(out_channels=options.n_classes, pretrained=False)
+    elif options.arch == 'efficientnet-b3':
+        net = get_efficientunet_b3(out_channels=options.n_classes, pretrained=False)
         net.n_classes = options.n_classes
 
     log_string('Model Generated.')
@@ -320,7 +321,8 @@ if __name__ == '__main__':
         optimizer = optim.Adam(net.parameters(), lr=options.lr, betas=(options.beta1, options.beta2), eps=1e-8,
                                weight_decay=options.weight_decay, amsgrad=False)
     else:
-        optimizer = optim.SGD(net.parameters(), lr=options.lr, momentum=options.beta1, weight_decay=options.weight_decay)
+        optimizer = optim.SGD(net.parameters(), lr=options.lr, momentum=options.beta1,
+                              weight_decay=options.weight_decay)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=100)
 
     ##################################
