@@ -15,49 +15,16 @@ import pandas as pd
 from config import options
 import numpy as np
 from PIL import Image
+from utils import global_shift_mask, rle_encode_less_memory, rle_to_mask
 from torchvision import transforms
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+
 
 def log_string(out_str):
     LOG_FOUT.write(out_str + '\n')
     LOG_FOUT.flush()
     print(out_str)
-
-def rle_encode_less_memory(img):
-    pixels = img.T.flatten()
-    pixels[0] = 0
-    pixels[-1] = 0
-    runs = np.where(pixels[1:] != pixels[:-1])[0] + 2
-    runs[1::2] -= runs[::2]
-    return ' '.join(str(x) for x in runs)
-
-def global_shift_mask(maskpred1, y_shift, x_shift):
-    """
-    applies a global shift to a mask by
-    padding one side and cropping from the other
-    """
-    if y_shift < 0 and x_shift >=0:
-        maskpred2 = np.pad(maskpred1,
-                           [(0,abs(y_shift)), (abs(x_shift), 0)],
-                           mode='constant', constant_values=0)
-        maskpred3 = maskpred2[abs(y_shift):, :maskpred1.shape[1]]
-    elif y_shift >=0 and x_shift <0:
-        maskpred2 = np.pad(maskpred1,
-                           [(abs(y_shift),0), (0, abs(x_shift))],
-                           mode='constant', constant_values=0)
-        maskpred3 = maskpred2[:maskpred1.shape[0], abs(x_shift):]
-    elif y_shift >=0 and x_shift >=0:
-        maskpred2 = np.pad(maskpred1,
-                           [(abs(y_shift),0), (abs(x_shift), 0)],
-                           mode='constant', constant_values=0)
-        maskpred3 = maskpred2[:maskpred1.shape[0], :maskpred1.shape[1]]
-    elif y_shift < 0 and x_shift < 0:
-        maskpred2 = np.pad(maskpred1,
-                           [(0, abs(y_shift)), (0, abs(x_shift))],
-                           mode='constant', constant_values=0)
-        maskpred3 = maskpred2[abs(y_shift):, abs(x_shift):]
-    return maskpred3
 
 
 def get_dice_coeff(pred, targs):
@@ -70,26 +37,32 @@ def get_dice_coeff(pred, targs):
 
     Returns: Dice coeff over a batch or over a single pair.
     '''
-    pred = (pred > 0).float()
-    return 2.0 * (pred * targs).sum() / ((pred + targs).sum() + 1.0)
+    pred = torch.sigmoid(pred)
+    # Converts mask to 0/1.
+    pred = (pred > options.threshold)
+    return (2.0 * (pred * targs).sum()) / ((pred + targs).sum() + 0.0001)
 
 
 class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
+    def forward(self, inputs, targets, smooth=0.0001):
         # comment out if your model contains a sigmoid or equivalent activation layer
         inputs = torch.sigmoid(inputs)
 
         # flatten label and prediction tensors
         inputs = inputs.view(-1)
+
+        targets = targets.contiguous()
         targets = targets.view(-1)
 
+        # Groudn truth is all zeros.
         intersection = (inputs * targets).sum()
         dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
 
         return 1 - dice
+
 
 def train():
     log_string('lr is ' + str(options.lr))
@@ -101,7 +74,6 @@ def train():
     losses = 0
     count = 0
     global_step = 0
-    dice_coeff_list = []
 
     for epoch in range(options.epochs):
         log_string('**' * 40)
@@ -113,10 +85,10 @@ def train():
             pred_mask_batch = model(img_batch)
 
             loss = criterion(pred_mask_batch, mask_batch)
-            #print("Loss",loss)
+            # print("Loss",loss)
             losses += loss.item()
-            #dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
-            #dice_coeff_list += dice_coeff
+            # dice_coeff = get_dice_coeff(torch.squeeze(pred_mask_btch), slice_mask)
+            # dice_coeff_list += dice_coeff
 
             optimizer.zero_grad()
             loss.backward()
@@ -124,13 +96,15 @@ def train():
             count += 1
             global_step += 1
             if (i + 1) % options.disp_freq == 0:
-                log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses/count))
+                log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses / count))
                 losses = 0
                 count = 0
+                best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
         log_string('--' * 40)
-        log_string('Evaluating at epoch #{}'.format(epoch+1))
-        best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
+        log_string('Evaluating at epoch #{}'.format(epoch + 1))
+        # best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
         model.train()
+
 
 def evaluate(**kwargs):
     best_loss = kwargs['best_loss']
@@ -139,18 +113,26 @@ def evaluate(**kwargs):
     model.eval()
     val_loss = 0
     val_acc = 0
+    height, width = val_dataset.get_global_image_size()
+    global_mask_pred = torch.zeros((height, width), dtype=torch.float).to(device)
+    model.eval()
     with torch.no_grad():
         for i, data in enumerate(val_loader):
-            img_batch, mask_batch = data
-            img_batch, mask_batch = img_batch.to(device, dtype=torch.float), mask_batch.to(device, dtype=torch.float)
+            img_batch, coordinates_batch = data
+            img_batch = img_batch.to(device, dtype=torch.float)
+            coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
             pred_mask_batch = model(img_batch)
 
-            loss = criterion(pred_mask_batch, mask_batch)
-            val_loss += loss.item()
-            val_acc += get_dice_coeff(pred_mask_batch, mask_batch)
+            # Loop through each img,mask in batch.
+            for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
+                each_mask = torch.squeeze(each_mask)
+                # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
+                x1, x2, y1, y2 = coordinate
+                global_mask_pred[int(y1):int(y2), int(x1):int(x2)] = each_mask
 
-        val_loss = val_loss/(i+1)
-        val_acc = val_acc/(i+1)
+    # pass through criterion to get loss.
+    val_loss = criterion(global_mask_pred, global_mask_target)
+    val_acc = get_dice_coeff(global_mask_pred, global_mask_target)
 
     # check for improvement
     loss_str, acc_str = '', ''
@@ -158,7 +140,6 @@ def evaluate(**kwargs):
     if val_loss <= best_loss:
         loss_str, best_loss = '(improved)', val_loss
         improved = True
-
         # save checkpoint model
         state_dict = model.state_dict()
         for key in state_dict.keys():
@@ -180,6 +161,7 @@ def evaluate(**kwargs):
     log_string('--' * 40)
     return best_loss, best_acc
 
+
 def predict():
     subm = {}
     all_files = os.listdir(BASE_DIR + "/testData")
@@ -196,24 +178,21 @@ def predict():
                                  shuffle=False, num_workers=options.workers, drop_last=False)
         height, width = test_dataset.get_global_image_size()
         global_mask = torch.zeros((height, width), dtype=torch.int8)
-        #global_mask = global_mask.to(device, dtype=torch.int8)
+        # global_mask = global_mask.to(device, dtype=torch.int8)
         with torch.no_grad():
             for i, data in enumerate(test_loader):
                 img_batch, coordinates_batch = data
                 img_batch = img_batch.to(device, dtype=torch.float)
                 coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
                 pred_mask_batch = model(img_batch)
-
-                # Converts mask to 0/1.
-                pred_mask_batch = (pred_mask_batch > options.threshold).type(torch.int8)
-                pred_mask_batch = pred_mask_batch * 255
+                pred_mask_batch = torch.sigmoid(pred_mask_batch)
 
                 # Loop through each img,mask in batch.
                 for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
                     each_mask = torch.squeeze(each_mask)
                     # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
                     x1, x2, y1, y2 = coordinate
-                    global_mask[int(y1):int(y2),int(x1):int(x2)] = each_mask
+                    global_mask[int(y1):int(y2), int(x1):int(x2)] = each_mask
         global_mask = global_mask.numpy()
 
         # Apply a shift on global mask.
@@ -228,6 +207,7 @@ def predict():
     df_sub = pd.DataFrame(subm).T
     df_sub.to_csv(save_dir + "/predictions/submission.csv", index=False)
     log_string("Done Testing")
+
 
 if __name__ == '__main__':
     ##################################
@@ -289,9 +269,19 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_dataset, batch_size=options.batch_size,
                               shuffle=True, num_workers=options.workers, drop_last=False)
 
-    val_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="val")
+    name = 'aaa6a05cc'
+    encoding_df = pd.read_csv(BASE_DIR + '/trainData/train.csv')
+    encoding = encoding_df.loc[encoding_df["id"] == name]['encoding'].iloc[0]
+    metadata_all = pd.read_csv(BASE_DIR + "/trainData/HuBMAP-20-dataset_information.csv")
+    width = metadata_all.loc[metadata_all["image_file"] == name + '.tiff']['width_pixels'].iloc[0]
+    height = metadata_all.loc[metadata_all["image_file"] == name + '.tiff']['height_pixels'].iloc[0]
+    global_mask_target = rle_to_mask(encoding, (height, width))
+    global_mask_target = torch.from_numpy(global_mask_target)
+    global_mask_target = global_mask_target.to(device, dtype=torch.float)
+
+    val_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="val", patient=name)
     val_loader = DataLoader(val_dataset, batch_size=options.batch_size,
-                              shuffle=False, num_workers=options.workers, drop_last=False)
+                            shuffle=False, num_workers=options.workers, drop_last=False)
 
     ##################################
     # TRAINING
@@ -301,4 +291,4 @@ if __name__ == '__main__':
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
 
     train()
-    #predict()
+    predict()

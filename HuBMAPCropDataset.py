@@ -19,7 +19,7 @@ class HuBMAPCropDataset(Dataset):
         self.masks = []  # The masks for 9 training patients.
         self.global_img = None
 
-        if mode == "train" or mode == "val":
+        if mode == "train":
             # Get all training patients.
             train_patients = pd.read_csv(base_dir + "/train.csv")
             leave_out_name = train_patients.iloc[options.test_tiff_value]['id']
@@ -29,18 +29,15 @@ class HuBMAPCropDataset(Dataset):
                 self.images = [x for x in images if leave_out_name not in x]
                 self.masks = [x for x in masks if leave_out_name not in x]
                 del images, masks
-            elif mode == "val":
-                images = os.listdir(self.base_dir + "/ImgCrops")
-                masks = os.listdir(self.base_dir + "/maskCrops")
-                self.images = [x for x in images if leave_out_name in x]
-                self.masks = [x for x in masks if leave_out_name in x]
-                del images, masks
-        elif mode == "test":
+        elif mode == "val" or mode == "test":
             tiff_file = tiff.imread(self.base_dir + "/" + patient + '.tiff')
             if len(tiff_file.shape) > 3:
                 tiff_file = tiff_file.squeeze(0).squeeze(0)
                 tiff_file = np.moveaxis(tiff_file, 0, -1)
-            grid = self.make_grid((tiff_file.shape[0], tiff_file.shape[1]), window=options.test_window)
+            if mode == "val":
+                grid = self.make_grid((tiff_file.shape[0], tiff_file.shape[1]), window=options.test_window)
+            elif mode == "test":
+                grid = self.make_grid((tiff_file.shape[0], tiff_file.shape[1]), window=options.val_window)
             if len(self.slice_indexes) > 0:
                 self.slice_indexes = np.concatenate((self.slice_indexes, grid), axis=0)
             else:
@@ -94,35 +91,16 @@ class HuBMAPCropDataset(Dataset):
             mask = mask * 255
 
             return img, mask
-        elif self.mode == "val":
-            file_name = self.images[index]
-            img = Image.open(self.base_dir + "/ImgCrops/" + file_name)
-            mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
-
-            img = transforms.ToTensor()(img)
-            mask = transforms.ToTensor()(mask)
-
-            merged = torch.cat((img, mask), 0)
-            crop = transforms.RandomCrop((options.val_window, options.val_window), pad_if_needed=True).forward(merged)
-
-            # # Split them back.
-            img = crop[:3, :, :]
-            mask = crop[-1:, :, :]
-
-            mask = mask * 255
-
-            return img, mask
-
-        elif self.mode == "test":
+        elif self.mode == "val" or self.mode == "test":
             coordinate = self.slice_indexes[index]
             x1, x2, y1, y2 = coordinate[0], coordinate[1], coordinate[2], coordinate[3]
-            img = self.global_img[y1:y2,x1:x2,:]
+            img = self.global_img[y1:y2, x1:x2, :]
             coordinate = torch.tensor([int(x1), int(x2), int(y1), int(y2)])
             img = transforms.ToTensor()(img)
             return img, coordinate
 
     def __len__(self):
-        if self.mode == "train" or self.mode == 'val':
+        if self.mode == "train":
             return len(self.images)
-        elif self.mode == "test":
+        elif self.mode == "val" or self.mode == "test":
             return len(self.slice_indexes)

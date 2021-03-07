@@ -58,11 +58,13 @@ for i, name in enumerate(train_patient_names):
         img_crop = img[y1:y2, x1:x2, :]
         mask_crop = global_mask[y1:y2, x1:x2]
 
-        im = Image.fromarray(img_crop)
-        im.save(BASE_DIR + "/trainData/ImgCrops/{}_{}_{}.png".format(name, x1, y1))
+        # im = Image.fromarray(img_crop)
+        # im.save(BASE_DIR + "/trainData/ImgCrops/{}_{}_{}.png".format(name, x1, y1))
+        #
+        # im = Image.fromarray(mask_crop)
+        # im.save(BASE_DIR + "/trainData/maskCrops/{}_{}_{}.png".format(name, x1, y1))
 
-        im = Image.fromarray(mask_crop)
-        im.save(BASE_DIR + "/trainData/maskCrops/{}_{}_{}.png".format(name, x1, y1))
+    break
 
 print('Success!!')
 

@@ -5,7 +5,8 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import numpy as np
 from config import *
-from train import global_shift_mask, rle_encode_less_memory
+from train import global_shift_mask
+from utils import rle_encode_less_memory
 from HuBMAPCropDataset import HuBMAPCropDataset
 from torch.utils.data import DataLoader
 from PIL import Image
@@ -37,6 +38,7 @@ def predict():
                 img_batch = img_batch.to(device, dtype=torch.float)
                 coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
                 pred_mask_batch = model(img_batch)
+                pred_mask_batch = torch.sigmoid(pred_mask_batch)
 
                 # Converts mask to 0/1.
                 pred_mask_batch = (pred_mask_batch > options.threshold).type(torch.int8)
@@ -51,7 +53,9 @@ def predict():
         global_mask = global_mask.numpy()
 
         # Apply a shift on global mask.
-        global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
+        if name == 'afa5e8098':
+            print('Applied global mask shift for {}'.format(name))
+            global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
         mask_img = Image.fromarray(global_mask)
         mask_img.save(save_dir + "/predictions/{}_mask.png".format(name))
         rle_pred = rle_encode_less_memory(global_mask)
@@ -68,7 +72,7 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # save dir
-    save_dir = BASE_DIR + '/save/20210220_171241'
+    save_dir = BASE_DIR + '/save/20210306_235833'
 
     model = get_efficientunet_b2(out_channels=1, pretrained=False)
     cudnn.benchmark = True
