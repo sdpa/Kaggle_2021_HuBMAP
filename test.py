@@ -19,14 +19,14 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 def predict():
     subm = {}
-    all_files = os.listdir(BASE_DIR + "/testData")
+    all_files = os.listdir(BASE_DIR + "/HuBMAP_Dataset/test")
     patient_files = [x for x in all_files if '.tiff' in x]
     model.eval()
     for patient_file in patient_files:
         name = patient_file[:-5]
         print('--' * 40)
         print("Predicting for patient: {}".format(name))
-        test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
+        test_dataset = HuBMAPCropDataset(BASE_DIR + "/HuBMAP_Dataset/test", mode='test', patient=name)
         test_loader = DataLoader(test_dataset, batch_size=4,
                                  shuffle=False, num_workers=options.workers, drop_last=False)
         height, width = test_dataset.get_global_image_size()

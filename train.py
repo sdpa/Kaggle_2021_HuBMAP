@@ -161,51 +161,52 @@ def evaluate(**kwargs):
     return best_loss, best_acc
 
 
-def predict():
-    subm = {}
-    all_files = os.listdir(BASE_DIR + "/testData")
-    patient_files = [x for x in all_files if '.tiff' in x]
-    best_model = os.listdir(model_dir)[-1]
-    model.load_state_dict(torch.load(save_dir + '/models/{}'.format(best_model)))
-    model.eval()
-    for patient_file in patient_files:
-        name = patient_file[:-5]
-        log_string('--' * 40)
-        log_string("Predicting for patient: {}".format(name))
-        test_dataset = HuBMAPCropDataset(BASE_DIR + "/testData", mode='test', patient=name)
-        test_loader = DataLoader(test_dataset, batch_size=8,
-                                 shuffle=False, num_workers=options.workers, drop_last=False)
-        height, width = test_dataset.get_global_image_size()
-        global_mask = torch.zeros((height, width), dtype=torch.int8)
-        # global_mask = global_mask.to(device, dtype=torch.int8)
-        with torch.no_grad():
-            for i, data in enumerate(test_loader):
-                img_batch, coordinates_batch = data
-                img_batch = img_batch.to(device, dtype=torch.float)
-                coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
-                pred_mask_batch = model(img_batch)
-                pred_mask_batch = torch.sigmoid(pred_mask_batch)
-
-                # Loop through each img,mask in batch.
-                for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
-                    each_mask = torch.squeeze(each_mask)
-                    # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
-                    x1, x2, y1, y2 = coordinate
-                    global_mask[int(y1):int(y2), int(x1):int(x2)] = each_mask
-        global_mask = global_mask.numpy()
-
-        # Apply a shift on global mask.
-        global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
-        mask_img = Image.fromarray(global_mask)
-        mask_img.save(save_dir + "/predictions/{}_mask.png".format(name))
-        rle_pred = rle_encode_less_memory(global_mask)
-
-        subm[i] = {'id': name, 'predicted': rle_pred}
-        del global_mask, rle_pred
-        log_string("processed {}".format(name))
-    df_sub = pd.DataFrame(subm).T
-    df_sub.to_csv(save_dir + "/predictions/submission.csv", index=False)
-    log_string("Done Testing")
+# Run test.py for test predictions
+# def predict():
+#     subm = {}
+#     all_files = os.listdir(BASE_DIR + "/testData")
+#     patient_files = [x for x in all_files if '.tiff' in x]
+#     best_model = os.listdir(model_dir)[-1]
+#     model.load_state_dict(torch.load(save_dir + '/models/{}'.format(best_model)))
+#     model.eval()
+#     for patient_file in patient_files:
+#         name = patient_file[:-5]
+#         log_string('--' * 40)
+#         log_string("Predicting for patient: {}".format(name))
+#         test_dataset = HuBMAPCropDataset(BASE_DIR + "/HuBMAP_Dataset/test", mode='test', patient=name)
+#         test_loader = DataLoader(test_dataset, batch_size=8,
+#                                  shuffle=False, num_workers=options.workers, drop_last=False)
+#         height, width = test_dataset.get_global_image_size()
+#         global_mask = torch.zeros((height, width), dtype=torch.int8)
+#         # global_mask = global_mask.to(device, dtype=torch.int8)
+#         with torch.no_grad():
+#             for i, data in enumerate(test_loader):
+#                 img_batch, coordinates_batch = data
+#                 img_batch = img_batch.to(device, dtype=torch.float)
+#                 coordinates_batch = coordinates_batch.to(device, dtype=torch.float)
+#                 pred_mask_batch = model(img_batch)
+#                 pred_mask_batch = torch.sigmoid(pred_mask_batch)
+#
+#                 # Loop through each img,mask in batch.
+#                 for each_mask, coordinate in zip(pred_mask_batch, coordinates_batch):
+#                     each_mask = torch.squeeze(each_mask)
+#                     # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
+#                     x1, x2, y1, y2 = coordinate
+#                     global_mask[int(y1):int(y2), int(x1):int(x2)] = each_mask
+#         global_mask = global_mask.numpy()
+#
+#         # Apply a shift on global mask.
+#         global_mask = global_shift_mask(global_mask, options.y_shift, options.x_shift)
+#         mask_img = Image.fromarray(global_mask)
+#         mask_img.save(save_dir + "/predictions/{}_mask.png".format(name))
+#         rle_pred = rle_encode_less_memory(global_mask)
+#
+#         subm[i] = {'id': name, 'predicted': rle_pred}
+#         del global_mask, rle_pred
+#         log_string("processed {}".format(name))
+#     df_sub = pd.DataFrame(subm).T
+#     df_sub.to_csv(save_dir + "/predictions/submission.csv", index=False)
+#     log_string("Done Testing")
 
 
 if __name__ == '__main__':
@@ -264,21 +265,21 @@ if __name__ == '__main__':
     ##################################
     # os.system('cp {}/dataset/dataset.py {}'.format(BASE_DIR, save_dir))
 
-    train_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="train")
+    train_dataset = HuBMAPCropDataset(BASE_DIR + "/HuBMAP_Dataset/", mode="train")
     train_loader = DataLoader(train_dataset, batch_size=options.batch_size,
                               shuffle=True, num_workers=options.workers, drop_last=False)
 
-    name = 'aaa6a05cc'
-    encoding_df = pd.read_csv(BASE_DIR + '/trainData/train.csv')
+    name = 'aaa6a05cc' # Make this patient the validation patient.
+    encoding_df = pd.read_csv(BASE_DIR + '/HuBMAP_Dataset/train.csv')
     encoding = encoding_df.loc[encoding_df["id"] == name]['encoding'].iloc[0]
-    metadata_all = pd.read_csv(BASE_DIR + "/trainData/HuBMAP-20-dataset_information.csv")
+    metadata_all = pd.read_csv(BASE_DIR + "/HuBMAP_Dataset/HuBMAP-20-dataset_information.csv")
     width = metadata_all.loc[metadata_all["image_file"] == name + '.tiff']['width_pixels'].iloc[0]
     height = metadata_all.loc[metadata_all["image_file"] == name + '.tiff']['height_pixels'].iloc[0]
     global_mask_target = rle_to_mask(encoding, (height, width))
     global_mask_target = torch.from_numpy(global_mask_target)
     global_mask_target = global_mask_target.to(device, dtype=torch.float)
 
-    val_dataset = HuBMAPCropDataset(BASE_DIR + "/trainData", mode="val", patient=name)
+    val_dataset = HuBMAPCropDataset(BASE_DIR + "/HuBMAP_Dataset/", mode="val", patient=name)
     val_loader = DataLoader(val_dataset, batch_size=options.batch_size,
                             shuffle=False, num_workers=options.workers, drop_last=False)
 
@@ -290,4 +291,4 @@ if __name__ == '__main__':
                format(options.epochs, options.batch_size, len(train_dataset), len(val_dataset)))
 
     train()
-    predict()
+    # predict()

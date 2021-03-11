@@ -24,14 +24,16 @@ class HuBMAPCropDataset(Dataset):
             train_patients = pd.read_csv(base_dir + "/train.csv")
             leave_out_name = train_patients.iloc[options.test_tiff_value]['id']
             if mode == "train":
-                images = os.listdir(self.base_dir + "/ImgCrops")
-                masks = os.listdir(self.base_dir + "/maskCrops")
+                images = os.listdir(self.base_dir + "/train/ImgCrops")
+                masks = os.listdir(self.base_dir + "/train/maskCrops")
                 self.images = [x for x in images if leave_out_name not in x]
                 self.masks = [x for x in masks if leave_out_name not in x]
                 del images, masks
         elif mode == "val" or mode == "test":
             tiff_file = tiff.imread(self.base_dir + "/" + patient + '.tiff')
-            print("Tiff file shape: ", tiff_file.shape)
+            #print("Tiff file shape: ", tiff_file.shape)
+            if len(tiff_file.shape) == 3 and tiff_file.shape[0] == 3:
+                tiff_file = np.moveaxis(tiff_file, 0, -1)
             if len(tiff_file.shape) > 3:
                 tiff_file = tiff_file.squeeze(0).squeeze(0)
                 tiff_file = np.moveaxis(tiff_file, 0, -1)
@@ -43,6 +45,7 @@ class HuBMAPCropDataset(Dataset):
                 self.slice_indexes = np.concatenate((self.slice_indexes, grid), axis=0)
             else:
                 self.slice_indexes = grid
+            # print("Fixed file size: ", tiff_file.shape)
             self.global_img = tiff_file
 
     def make_grid(self, shape, window=options.test_window, min_overlap=0):
@@ -69,8 +72,8 @@ class HuBMAPCropDataset(Dataset):
     def __getitem__(self, index):
         if self.mode == "train":
             file_name = self.images[index]
-            img = Image.open(self.base_dir + "/ImgCrops/" + file_name)
-            mask = Image.open(self.base_dir + "/maskCrops/" + file_name)
+            img = Image.open(self.base_dir + "/train/ImgCrops/" + file_name)
+            mask = Image.open(self.base_dir + "/train/maskCrops/" + file_name)
 
             img = transforms.ColorJitter(brightness=0.5, contrast=0.5, hue=.05, saturation=.05).forward(img)
             img = transforms.GaussianBlur(kernel_size=(3,3)).forward(img)
