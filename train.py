@@ -111,8 +111,6 @@ def evaluate(**kwargs):
     best_acc = kwargs['best_acc']
     global_step = kwargs['global_step']
     model.eval()
-    val_loss = 0
-    val_acc = 0
     height, width = val_dataset.get_global_image_size()
     global_mask_pred = torch.zeros((height, width), dtype=torch.float).to(device)
     model.eval()
@@ -140,6 +138,9 @@ def evaluate(**kwargs):
     if val_loss <= best_loss:
         loss_str, best_loss = '(improved)', val_loss
         improved = True
+    if val_acc >= best_acc:
+        acc_str, best_acc = '(improved)', val_acc
+    if val_loss <= best_loss or val_acc >= best_acc:
         # save checkpoint model
         state_dict = model.state_dict()
         for key in state_dict.keys():
@@ -153,8 +154,6 @@ def evaluate(**kwargs):
             'state_dict': state_dict},
             save_path)
         log_string('Model saved at: {}'.format(save_path))
-    if val_acc >= best_acc:
-        acc_str, best_acc = '(improved)', val_acc
     # display
     log_string("validation_loss: {0:.4f} {1}".format(val_loss, loss_str))
     log_string("validation_accuracy: {0:.4f} {1}".format(val_acc, acc_str))

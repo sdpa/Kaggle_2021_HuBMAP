@@ -35,7 +35,7 @@ parser.add_option('--m', '--model', dest='model', default='efficientnet-b2',
                   help='vgg, inception, resnet, densenet (default: resnet)')
 parser.add_option('--lr', '--lr', dest='lr', default=0.001, type='float',
                   help='learning rate(default: 0.001)')
-parser.add_option('--lm', '--load_model', dest='load_model', default='/home/cougarnet.uh.edu/sdpatiba/Desktop/Kaggle_2021_HuBMAP/save/20210306_235833/models/19520.ckpt',
+parser.add_option('--lm', '--load_model', dest='load_model', default='/home/cougarnet.uh.edu/sdpatiba/Desktop/Kaggle_2021_HuBMAP/save/20210307_235359/models/79570.ckpt',
                   help='Path to load the model')
 
 

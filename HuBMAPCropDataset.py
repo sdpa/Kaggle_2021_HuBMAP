@@ -31,6 +31,7 @@ class HuBMAPCropDataset(Dataset):
                 del images, masks
         elif mode == "val" or mode == "test":
             tiff_file = tiff.imread(self.base_dir + "/" + patient + '.tiff')
+            print("Tiff file shape: ", tiff_file.shape)
             if len(tiff_file.shape) > 3:
                 tiff_file = tiff_file.squeeze(0).squeeze(0)
                 tiff_file = np.moveaxis(tiff_file, 0, -1)

@@ -72,7 +72,7 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # save dir
-    save_dir = BASE_DIR + '/save/20210306_235833'
+    save_dir = BASE_DIR + '/save/20210307_235359'
 
     model = get_efficientunet_b2(out_channels=1, pretrained=False)
     cudnn.benchmark = True
