@@ -229,9 +229,8 @@ for i, name in enumerate(train_patient_names):
                 img_crop = img[y1:y2, x1:x2, :]
                 im = Image.fromarray(img_crop)
                 im.save(BASE_DIR + "/HUBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
-
                 im = Image.fromarray(mask_crop)
-                # im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
+                im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
             elif medulla_exists:
                 medulla_created += 1
                 ax.plot(*box.exterior.xy, color='orange')
@@ -241,7 +240,7 @@ for i, name in enumerate(train_patient_names):
                 im.save(BASE_DIR + "/HUBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
 
                 im = Image.fromarray(mask_crop)
-                # im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
+                im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
             elif bg_exists:
                 background_created += 1
                 ax.plot(*box.exterior.xy, color='blue')
@@ -249,6 +248,7 @@ for i, name in enumerate(train_patient_names):
                 img_crop = img[y1:y2, x1:x2, :]
                 im = Image.fromarray(img_crop)
                 im.save(BASE_DIR + "/HUBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
+
 
     plt.axis('equal')
     plt.title(name)
