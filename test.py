@@ -64,7 +64,7 @@ def predict():
         del global_mask, rle_pred
         print("processed {}".format(name))
     df_sub = pd.DataFrame(subm).T
-    df_sub.to_csv(save_dir + "/predictions/submission.csv", index=False)
+    df_sub.to_csv(save_dir + "/predictions/submission.csv", index=False)#
     print("Done Testing")
 
 if __name__ == '__main__':

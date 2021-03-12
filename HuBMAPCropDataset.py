@@ -25,6 +25,7 @@ class HuBMAPCropDataset(Dataset):
             leave_out_name = train_patients.iloc[options.test_tiff_value]['id']
             if mode == "train":
                 images = os.listdir(self.base_dir + "/train/ImgCrops")
+                #
                 masks = os.listdir(self.base_dir + "/train/maskCrops")
                 self.images = [x for x in images if leave_out_name not in x]
                 self.masks = [x for x in masks if leave_out_name not in x]

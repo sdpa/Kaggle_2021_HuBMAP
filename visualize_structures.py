@@ -29,7 +29,7 @@ for i,name in enumerate(train_names):
         patient_meta = meta_data[meta_data['image_file'] == name + '.tiff']
         rows = patient_meta['height_pixels'].iloc[0]
         cols = patient_meta['width_pixels'].iloc[0]
-        print("=="*10)
+        print("=="*10)#
         print(name)
         ax.set(xlim=(0, cols), ylim=(rows, 0))
         for k in range(len(anatomical_data)):
