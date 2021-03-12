@@ -108,10 +108,10 @@ for i, name in enumerate(train_patient_names):
         save_name = name + '_glom_' + str(new_y1) + '_' + str(new_x1)
         img_crop = img[new_y1:new_y2, new_x1:new_x2, :]
         im = Image.fromarray(img_crop)
-        im.save(BASE_DIR + "/HuBMAP_Dataset/ImgCrops/{}.png".format(save_name))
+        im.save(BASE_DIR + "/HuBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
 
         im = Image.fromarray(mask_crop)
-        im.save(BASE_DIR + "/HuBMAP_Dataset/maskCrops/{}.png".format(save_name))
+        im.save(BASE_DIR + "/HuBMAP_Dataset/train/maskCrops/{}.png".format(save_name))
 
         glm_pts = [[new_x1, new_y1], [new_x1, new_y2], [new_x2, new_y2], [new_x2, new_y1]]
         glom_sh = Polygon(glm_pts)
@@ -230,26 +230,27 @@ for i, name in enumerate(train_patient_names):
                 im = Image.fromarray(img_crop)
                 im.save(BASE_DIR + "/HUBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
                 im = Image.fromarray(mask_crop)
-                im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
+                im.save(BASE_DIR + "/HUBMAP_Dataset/train/maskCrops/{}.png".format(save_name))
             elif medulla_exists:
                 medulla_created += 1
                 ax.plot(*box.exterior.xy, color='orange')
                 save_name = name + '_medulla_' + str(y1) + '_' + str(x1)
                 img_crop = img[y1:y2, x1:x2, :]
                 im = Image.fromarray(img_crop)
-                im.save(BASE_DIR + "/HUBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
+                im.save(BASE_DIR + "/HuBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
 
                 im = Image.fromarray(mask_crop)
-                im.save(BASE_DIR + "/trainData/maskCrops/{}.png".format(save_name))
+                im.save(BASE_DIR + "/HuBMAP_Dataset/train/maskCrops/{}.png".format(save_name))
             elif bg_exists:
                 background_created += 1
                 ax.plot(*box.exterior.xy, color='blue')
                 save_name = name + '_bg_' + str(y1) + '_' + str(x1)
                 img_crop = img[y1:y2, x1:x2, :]
                 im = Image.fromarray(img_crop)
-                im.save(BASE_DIR + "/HUBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
+                im.save(BASE_DIR + "/HuBMAP_Dataset/train/ImgCrops/{}.png".format(save_name))
 
-
+                im = Image.fromarray(mask_crop)
+                im.save(BASE_DIR + "/HuBMAP_Dataset/train/maskCrops/{}.png".format(save_name))
     plt.axis('equal')
     plt.title(name)
     plt.show()
