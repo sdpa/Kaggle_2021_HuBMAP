@@ -99,7 +99,7 @@ def train():
                 log_string("epoch: {0}, batch_id:{1} train_dice_loss: {2:.4f}".format(epoch + 1, i + 1, losses / count))
                 losses = 0
                 count = 0
-                best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
+                best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step, eval_unit='crop')
         log_string('--' * 40)
         log_string('Evaluating at epoch #{}'.format(epoch + 1))
         # best_loss, best_acc = evaluate(best_loss=best_loss, best_acc=best_acc, global_step=global_step)
@@ -110,10 +110,12 @@ def evaluate(**kwargs):
     best_loss = kwargs['best_loss']
     best_acc = kwargs['best_acc']
     global_step = kwargs['global_step']
+    eval_unit = kwargs['eval_unit']
     model.eval()
     height, width = val_dataset.get_global_image_size()
     global_mask_pred = torch.zeros((height, width), dtype=torch.float).to(device)
     model.eval()
+    if eval_unit == 'crop': val_loss, val_acc, num_crops = 0, 0, 0
     with torch.no_grad():
         for i, data in enumerate(val_loader):
             img_batch, coordinates_batch = data
@@ -126,11 +128,20 @@ def evaluate(**kwargs):
                 each_mask = torch.squeeze(each_mask)
                 # xs = columns, ys = rows. (x1,y1) --> Top Left. (x2,y2) --> bottom right.
                 x1, x2, y1, y2 = coordinate
-                global_mask_pred[int(y1):int(y2), int(x1):int(x2)] = each_mask
+                if eval_unit == 'crop':
+                    val_loss += criterion(each_mask, global_mask_target[int(y1):int(y2), int(x1):int(x2)])
+                    val_acc += get_dice_coeff(each_mask, global_mask_target[int(y1):int(y2), int(x1):int(x2)])
+                    num_crops += 1
+                else:
+                    global_mask_pred[int(y1):int(y2), int(x1):int(x2)] = each_mask
 
     # pass through criterion to get loss.
-    val_loss = criterion(global_mask_pred, global_mask_target)
-    val_acc = get_dice_coeff(global_mask_pred, global_mask_target)
+    if eval_unit == 'crop':
+        val_loss /= num_crops
+        val_acc /= num_crops
+    else:
+        val_loss = criterion(global_mask_pred, global_mask_target)
+        val_acc = get_dice_coeff(global_mask_pred, global_mask_target)
 
     # check for improvement
     loss_str, acc_str = '', ''
